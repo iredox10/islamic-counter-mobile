@@ -323,7 +323,72 @@ export async function exportAllData(): Promise<string> {
 }
 
 export async function importAllData(json: string): Promise<void> {
-  const parsed = JSON.parse(json) as DatabaseState;
-  state = { ...EMPTY_DB, ...parsed };
-  await persist();
+  await importAndMergeData(json, 'replace');
+}
+
+export async function importAndMergeData(
+  json: string,
+  mode: 'merge' | 'replace' = 'merge'
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Create a safety restore point backup
+    await safeStorage.setItem('islamic-counter-db-backup', JSON.stringify(state));
+
+    const imported = JSON.parse(json) as Partial<DatabaseState>;
+    if (!imported || typeof imported !== 'object') {
+      return { success: false, message: 'Invalid database backup JSON.' };
+    }
+
+    if (mode === 'replace') {
+      state = { ...EMPTY_DB, ...imported, nextId: imported.nextId || nextId() };
+      await persist();
+      return { success: true, message: 'Database replaced successfully. Backup created.' };
+    }
+
+    // 2. Smart Merge Strategy
+    const existingLogKeys = new Set(
+      state.logs.map((l) => `${l.dateStr}_${l.timestamp}_${l.count}`)
+    );
+    const newLogs: Log[] = [];
+    (imported.logs || []).forEach((l) => {
+      const key = `${l.dateStr}_${l.timestamp}_${l.count}`;
+      if (!existingLogKeys.has(key)) {
+        newLogs.push({ ...l, id: nextId() });
+        existingLogKeys.add(key);
+      }
+    });
+
+    const existingTargetTitles = new Set(state.targets.map((t) => t.title.toLowerCase()));
+    const newTargets: Target[] = [];
+    (imported.targets || []).forEach((t) => {
+      if (!existingTargetTitles.has(t.title.toLowerCase())) {
+        newTargets.push({ ...t, id: nextId() });
+        existingTargetTitles.add(t.title.toLowerCase());
+      }
+    });
+
+    const existingAchievementIds = new Set(state.achievements.map((a) => a.achievementId));
+    const newAchievements: UnlockedAchievement[] = [];
+    (imported.achievements || []).forEach((a) => {
+      if (!existingAchievementIds.has(a.achievementId)) {
+        newAchievements.push({ ...a, id: nextId() });
+        existingAchievementIds.add(a.achievementId);
+      }
+    });
+
+    state = {
+      ...state,
+      logs: [...state.logs, ...newLogs],
+      targets: [...state.targets, ...newTargets],
+      achievements: [...state.achievements, ...newAchievements],
+    };
+
+    await persist();
+    return {
+      success: true,
+      message: `Merged ${newLogs.length} new logs, ${newTargets.length} new targets, and ${newAchievements.length} achievements.`,
+    };
+  } catch (e: any) {
+    return { success: false, message: e?.message || 'Failed to import backup.' };
+  }
 }

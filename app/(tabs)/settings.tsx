@@ -16,6 +16,7 @@ import {
   Monitor,
   Trash2,
   Download,
+  Upload,
   RefreshCw,
   Volume2,
   Bell,
@@ -32,7 +33,7 @@ import {
   updateReminder,
   type DailyReminder,
 } from '@/lib/reminders';
-import { clearAllData, exportAllData } from '@/lib/db';
+import { clearAllData, exportAllData, importAndMergeData } from '@/lib/db';
 import { requestNotificationPermissions, scheduleLocalReminder } from '@/lib/pushNotifications';
 
 export default function SettingsScreen() {
@@ -79,6 +80,34 @@ export default function SettingsScreen() {
     } catch (e) {
       Alert.alert('Export failed', String(e));
     }
+  };
+
+  const handleImportPrompt = () => {
+    Alert.prompt(
+      'Import Backup',
+      'Paste your database backup JSON string below:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Smart Merge',
+          onPress: async (json?: string) => {
+            if (!json) return;
+            const res = await importAndMergeData(json, 'merge');
+            Alert.alert(res.success ? 'Success' : 'Import Error', res.message);
+          },
+        },
+        {
+          text: 'Replace All',
+          style: 'destructive',
+          onPress: async (json?: string) => {
+            if (!json) return;
+            const res = await importAndMergeData(json, 'replace');
+            Alert.alert(res.success ? 'Success' : 'Import Error', res.message);
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   const handleClear = () => {
@@ -201,6 +230,13 @@ export default function SettingsScreen() {
               <Row
                 icon={<Download size={18} color={colors.gold} />}
                 label="Export backup"
+                colors={colors}
+              />
+            </Pressable>
+            <Pressable onPress={handleImportPrompt}>
+              <Row
+                icon={<Upload size={18} color={colors.gold} />}
+                label="Import backup (Smart Merge / Replace)"
                 colors={colors}
               />
             </Pressable>

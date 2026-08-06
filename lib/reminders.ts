@@ -66,6 +66,14 @@ export const DEFAULT_REMINDERS: DailyReminder[] = [
     isSalahTime: false,
     message: 'Time for evening adhkar',
   },
+  {
+    id: 'fasting_sunnah',
+    name: 'Voluntary Fasting (Mondays/Thursdays & White Days)',
+    time: '04:30',
+    enabled: false,
+    isSalahTime: false,
+    message: 'Suhoor reminder for Sunnah voluntary fast today',
+  },
 ];
 
 const STORAGE_KEY = 'daily-reminders';

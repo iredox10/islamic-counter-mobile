@@ -127,3 +127,29 @@ function getDayOfYear(month: number, day: number): number {
   const daysInMonths = [0, 30, 59, 89, 118, 148, 177, 207, 236, 266, 296, 325];
   return (daysInMonths[month - 1] || 0) + day;
 }
+
+export function isVoluntaryFastDay(date: Date = new Date()): {
+  isFastDay: boolean;
+  reason?: string;
+} {
+  const dayOfWeek = date.getDay();
+  const hijri = gregorianToHijri(date);
+
+  if (dayOfWeek === 1) {
+    return { isFastDay: true, reason: 'Monday Sunnah Fast' };
+  }
+  if (dayOfWeek === 4) {
+    return { isFastDay: true, reason: 'Thursday Sunnah Fast' };
+  }
+  if ([13, 14, 15].includes(hijri.day) && hijri.month !== 9) {
+    return { isFastDay: true, reason: `White Day (${hijri.day} ${hijri.monthName})` };
+  }
+  if (hijri.month === 1 && hijri.day === 10) {
+    return { isFastDay: true, reason: 'Day of Ashura Fast' };
+  }
+  if (hijri.month === 12 && hijri.day === 9) {
+    return { isFastDay: true, reason: 'Day of Arafah Fast' };
+  }
+
+  return { isFastDay: false };
+}
