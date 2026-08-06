@@ -526,40 +526,44 @@ export default function CounterScreen() {
 
           {/* ── Main Counter ───────────────────────────────────────────── */}
           <View style={styles.counterArea}>
-            {/* thin progress ring around the button */}
             <View
-              pointerEvents="none"
               style={[
-                styles.ringSvgWrap,
+                styles.counterCircle,
                 { width: RING_SIZE, height: RING_SIZE },
               ]}
             >
-              <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}>
-                <SvgCircle
-                  cx={RING_VIEWBOX / 2}
-                  cy={RING_VIEWBOX / 2}
-                  r={RING_RADIUS}
-                  stroke={colors.cardBorder}
-                  strokeWidth={RING_STROKE}
-                  fill="none"
-                />
-                <SvgCircle
-                  cx={RING_VIEWBOX / 2}
-                  cy={RING_VIEWBOX / 2}
-                  r={RING_RADIUS}
-                  stroke={colors.gold}
-                  strokeWidth={RING_STROKE}
-                  fill="none"
-                  strokeLinecap="round"
-                  rotation={-90}
-                  originX={RING_VIEWBOX / 2}
-                  originY={RING_VIEWBOX / 2}
-                  strokeDasharray={RING_CIRCUMFERENCE}
-                  strokeDashoffset={
-                    RING_CIRCUMFERENCE * (1 - Math.min(100, progress) / 100)
-                  }
-                />
-              </Svg>
+              {/* thin progress ring around the button */}
+              <View
+                pointerEvents="none"
+                style={StyleSheet.absoluteFill}
+              >
+                <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}>
+                  <SvgCircle
+                    cx={RING_VIEWBOX / 2}
+                    cy={RING_VIEWBOX / 2}
+                    r={RING_RADIUS}
+                    stroke={colors.cardBorder}
+                    strokeWidth={RING_STROKE}
+                    fill="none"
+                  />
+                  <SvgCircle
+                    cx={RING_VIEWBOX / 2}
+                    cy={RING_VIEWBOX / 2}
+                    r={RING_RADIUS}
+                    stroke={colors.gold}
+                    strokeWidth={RING_STROKE}
+                    fill="none"
+                    strokeLinecap="round"
+                    rotation={-90}
+                    originX={RING_VIEWBOX / 2}
+                    originY={RING_VIEWBOX / 2}
+                    strokeDasharray={RING_CIRCUMFERENCE}
+                    strokeDashoffset={
+                      RING_CIRCUMFERENCE * (1 - Math.min(100, progress) / 100)
+                    }
+                  />
+                </Svg>
+              </View>
 
               {/* the button */}
               <View style={[styles.button, { backgroundColor: colors.backgroundSecondary }, ripple && styles.buttonPressed]}>
@@ -964,7 +968,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
-  ringSvgWrap: {
+  counterCircle: {
     position: 'relative',
   },
   button: {
