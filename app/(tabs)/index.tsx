@@ -23,7 +23,6 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
-import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -563,12 +562,7 @@ export default function CounterScreen() {
               </Svg>
 
               {/* the button */}
-              <LinearGradient
-                colors={['#1e293b', '#020617']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.button, ripple && styles.buttonPressed]}
-              >
+              <View style={[styles.button, { backgroundColor: colors.backgroundSecondary }, ripple && styles.buttonPressed]}>
                 <Pressable
                   onPress={handleTap}
                   style={({ pressed }) => [
@@ -604,7 +598,7 @@ export default function CounterScreen() {
                     </Text>
                   </View>
                 </Pressable>
-              </LinearGradient>
+              </View>
             </View>
 
             {/* Cycle / Goal indicator */}
