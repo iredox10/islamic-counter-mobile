@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
-  TextInput,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +19,10 @@ import {
   Check,
   Circle,
   Calendar,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -36,7 +38,12 @@ import {
   getUnlockedAchievements,
 } from '@/lib/db';
 import { calculateStreak, todayStr } from '@/lib/utils';
-import { gregorianToHijri, getSpecialDay } from '@/lib/hijri';
+import {
+  gregorianToHijri,
+  getSpecialDay,
+  getUpcomingSpecialDays,
+  isVoluntaryFastDay,
+} from '@/lib/hijri';
 import {
   PRAYERS,
   getPrayerAdhkar,
@@ -49,12 +56,18 @@ import { playTapSound, playCompletionSound } from '@/lib/sounds';
 import { useAchievementTracker } from '@/lib/useAchievementTracker';
 import { shareProgress } from '@/lib/share';
 import { AchievementToast } from '@/components/AchievementToast';
+import { ConnectionBanner } from '@/components/ConnectionBanner';
 
 const MULTI_PRESET = [
   { name: 'SubhanAllah', arabic: 'سُبْحَانَ اللَّهِ', target: 33 },
   { name: 'Alhamdulillah', arabic: 'الْحَمْدُ لِلَّهِ', target: 33 },
   { name: 'Allahu Akbar', arabic: 'اللَّهُ أَكْبَرُ', target: 33 },
 ];
+
+const RING_RADIUS = 118;
+const RING_STROKE = 12;
+const RING_SVG_SIZE = 272;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export default function CounterScreen() {
   const { colors } = useTheme();
@@ -68,6 +81,7 @@ export default function CounterScreen() {
     targetId: null as number | null,
   });
   const [soundEnabled, setSoundEnabled] = useBooleanSetting(KEYS.sound, false);
+  const [showAdhkarList, setShowAdhkarList] = useBooleanSetting(KEYS.showAdhkarList, true);
   const [multiMode, setMultiMode] = useBooleanSetting(KEYS.multiMode, false);
   const [multiCounts, setMultiCounts] = useJsonSetting(KEYS.multiCounter, [0, 0, 0]);
   const [autoReset] = useBooleanSetting(KEYS.autoReset, false);
@@ -78,8 +92,6 @@ export default function CounterScreen() {
   const [prayerCounts, setPrayerCounts] = useState<number[]>([]);
   const [activeAdhkarIndex, setActiveAdhkarIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
-  const [showManual, setShowManual] = useState(false);
-  const [manualValue, setManualValue] = useState('');
   const [ripple, setRipple] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [toastAchievement, setToastAchievement] = useState<Achievement | null>(null);
@@ -145,6 +157,7 @@ export default function CounterScreen() {
 
   const hijri = gregorianToHijri(new Date());
   const specialDay = getSpecialDay(hijri);
+  const upcomingDays = getUpcomingSpecialDays(hijri, 1);
 
   const displayCount = prayerMode
     ? prayerCounts[activeAdhkarIndex] ?? 0
@@ -161,9 +174,13 @@ export default function CounterScreen() {
         : 33;
 
   const progress =
-    displayTarget > 0
-      ? Math.min(100, (displayCount / displayTarget) * 100)
-      : 0;
+    prayerMode && prayerAdhkar.length > 0
+      ? Math.min(100, ((prayerCounts[activeAdhkarIndex] || 0) / prayerAdhkar[activeAdhkarIndex].target) * 100)
+      : multiMode
+        ? Math.min(100, (multiCounts[activeCounterIndex] / MULTI_PRESET[activeCounterIndex].target) * 100)
+        : activeTarget
+          ? Math.min(100, (activeTarget.currentCount / activeTarget.targetCount) * 100)
+          : ((count % 33) / 33) * 100;
 
   const displayLabel = prayerMode && prayerAdhkar[activeAdhkarIndex]
     ? prayerAdhkar[activeAdhkarIndex].title
@@ -295,15 +312,18 @@ export default function CounterScreen() {
   };
 
   const handleReset = () => {
-    Alert.alert('Reset counter?', 'Session count will be set to 0.', [
+    Alert.alert('Reset counter?', 'Session and goal progress will be reset to 0.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reset',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           setSessionCount({ count: 0, targetId: activeTargetId });
           setMultiCounts([0, 0, 0]);
           setActiveCounterIndex(0);
+          if (activeTargetId) {
+            await updateTarget(activeTargetId, { currentCount: 0 });
+          }
           if (prayerMode) {
             setPrayerCounts(prayerAdhkar.map(() => 0));
             setActiveAdhkarIndex(0);
@@ -313,18 +333,12 @@ export default function CounterScreen() {
     ]);
   };
 
-  const applyManual = () => {
-    const n = parseInt(manualValue, 10);
-    if (!n || n < 0) return;
-    setSessionCount({ count: n, targetId: activeTargetId });
-    setShowManual(false);
-    setManualValue('');
-  };
-
   const completedPrayers = new Set(prayerCompletions.map((p) => p.prayer));
+  const voluntaryFast = isVoluntaryFastDay();
 
   return (
     <Screen>
+      <ConnectionBanner />
       <AchievementToast
         achievement={toastAchievement}
         onDismiss={() => setToastAchievement(null)}
@@ -336,12 +350,22 @@ export default function CounterScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Title style={{ fontSize: 24 }}>Tasbih</Title>
               <Subtitle>
                 {hijri.formatted}
                 {specialDay ? ` · ${specialDay.name}` : ''}
               </Subtitle>
+              {voluntaryFast.isFastDay && (
+                <Text style={{ color: colors.gold, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  🌙 {voluntaryFast.reason}
+                </Text>
+              )}
+              {upcomingDays.length > 0 && !specialDay && (
+                <Text style={{ color: colors.success, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  Next: {upcomingDays[0].name} in {upcomingDays[0].daysUntil} days
+                </Text>
+              )}
             </View>
             <View style={styles.headerActions}>
               <Pressable
@@ -482,57 +506,116 @@ export default function CounterScreen() {
           )}
 
           {/* Counter ring */}
-          <Pressable
-            onPress={handleTap}
-            onLongPress={() => setShowManual(true)}
-            style={styles.counterWrap}
-          >
-            <View
-              style={[
-                styles.ringOuter,
-                {
-                  borderColor: colors.gold,
-                  backgroundColor: ripple ? colors.goldMuted : 'transparent',
-                },
+          <View style={styles.counterArea}>
+            <View pointerEvents="none" style={styles.ringSvgWrap}>
+              <Svg width={RING_SVG_SIZE} height={RING_SVG_SIZE}>
+                <SvgCircle
+                  cx={RING_SVG_SIZE / 2}
+                  cy={RING_SVG_SIZE / 2}
+                  r={RING_RADIUS}
+                  stroke={colors.cardBorder}
+                  strokeWidth={RING_STROKE}
+                  fill="none"
+                />
+                <SvgCircle
+                  cx={RING_SVG_SIZE / 2}
+                  cy={RING_SVG_SIZE / 2}
+                  r={RING_RADIUS}
+                  stroke={colors.gold}
+                  strokeWidth={RING_STROKE}
+                  fill="none"
+                  strokeLinecap="round"
+                  rotation={-90}
+                  originX={RING_SVG_SIZE / 2}
+                  originY={RING_SVG_SIZE / 2}
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  strokeDashoffset={
+                    RING_CIRCUMFERENCE * (1 - Math.min(100, progress) / 100)
+                  }
+                />
+              </Svg>
+            </View>
+            <Pressable
+              onPress={handleTap}
+              style={({ pressed }) => [
+                styles.counterWrap,
+                { opacity: pressed ? 0.9 : 1 },
               ]}
             >
               <View
                 style={[
-                  styles.ringInner,
+                  styles.ringOuter,
                   {
-                    borderColor: colors.cardBorder,
-                    backgroundColor: colors.card,
+                    borderColor: colors.gold,
+                    backgroundColor: ripple ? colors.goldMuted : 'transparent',
                   },
                 ]}
               >
-                <Text style={[styles.countNum, { color: colors.gold }]}>
-                  {displayCount}
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                  / {displayTarget}
-                </Text>
                 <View
                   style={[
-                    styles.progressBar,
-                    { backgroundColor: colors.inputBg },
+                    styles.ringInner,
+                    {
+                      borderColor: colors.cardBorder,
+                      backgroundColor: colors.card,
+                    },
                   ]}
                 >
+                  <Text style={[styles.countNum, { color: colors.gold }]}>
+                    {displayCount}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                    / {displayTarget}
+                  </Text>
                   <View
                     style={[
-                      styles.progressFill,
-                      {
-                        width: `${progress}%`,
-                        backgroundColor: colors.gold,
-                      },
+                      styles.progressBar,
+                      { backgroundColor: colors.inputBg },
                     ]}
-                  />
+                  >
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${progress}%`,
+                          backgroundColor: colors.gold,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
               </View>
-            </View>
+            </Pressable>
             <Text style={[styles.tapHint, { color: colors.textMuted }]}>
-              Tap to count · Hold for manual entry
+              Tap to count
             </Text>
-          </Pressable>
+          </View>
+
+          {/* Cycle / Goal indicator */}
+          {!prayerMode && !multiMode && (
+            <View style={styles.cycleRow}>
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {activeTarget ? 'Goal' : 'Cycle'}
+              </Text>
+              <View
+                style={[
+                  styles.cycleLine,
+                  { backgroundColor: colors.cardBorder },
+                ]}
+              />
+              <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '600' }}>
+                {activeTarget
+                  ? `${activeTarget.currentCount}/${activeTarget.targetCount}`
+                  : `${count % 33}/33`}
+              </Text>
+            </View>
+          )}
 
           {/* Current dhikr info */}
           <Card style={{ marginTop: 8 }}>
@@ -559,66 +642,80 @@ export default function CounterScreen() {
                 {displayArabic}
               </Text>
             ) : null}
-            {activeTarget && !multiMode && !prayerMode ? (
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  textAlign: 'center',
-                  marginTop: 8,
-                  fontSize: 13,
-                }}
-              >
-                Goal: {activeTarget.currentCount}/{activeTarget.targetCount}
-              </Text>
-            ) : null}
           </Card>
 
           {/* Prayer adhkar list */}
           {prayerMode && prayerAdhkar.length > 0 && (
             <View style={{ marginTop: 16, gap: 8 }}>
-              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                {PRAYERS.find((p) => p.id === prayerMode)?.name} Adhkar
-              </Text>
-              {prayerAdhkar.map((item, i) => {
-                const c = prayerCounts[i] || 0;
-                const done = c >= item.target;
-                const active = i === activeAdhkarIndex;
-                return (
-                  <Pressable
-                    key={`${item.title}-${i}`}
-                    onPress={() => setActiveAdhkarIndex(i)}
-                    style={[
-                      styles.adhkarRow,
-                      {
-                        backgroundColor: active ? colors.goldMuted : colors.card,
-                        borderColor: active
-                          ? colors.gold
-                          : done
-                            ? colors.success
-                            : colors.cardBorder,
-                      },
-                    ]}
+              <Pressable
+                onPress={() => setShowAdhkarList(!showAdhkarList)}
+                style={styles.adhkarListHeader}
+              >
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                  {PRAYERS.find((p) => p.id === prayerMode)?.name} Adhkar
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 12,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontWeight: '600',
-                          fontSize: 14,
-                        }}
+                    {showAdhkarList ? 'Hide' : 'Show'}
+                  </Text>
+                  {showAdhkarList ? (
+                    <ChevronUp size={14} color={colors.textMuted} />
+                  ) : (
+                    <ChevronDown size={14} color={colors.textMuted} />
+                  )}
+                </View>
+              </Pressable>
+              {showAdhkarList && (
+                <View style={{ gap: 8 }}>
+                  {prayerAdhkar.map((item, i) => {
+                    const c = prayerCounts[i] || 0;
+                    const done = c >= item.target;
+                    const active = i === activeAdhkarIndex;
+                    return (
+                      <Pressable
+                        key={`${item.title}-${i}`}
+                        onPress={() => setActiveAdhkarIndex(i)}
+                        style={[
+                          styles.adhkarRow,
+                          {
+                            backgroundColor: active ? colors.goldMuted : colors.card,
+                            borderColor: active
+                              ? colors.gold
+                              : done
+                                ? colors.success
+                                : colors.cardBorder,
+                          },
+                        ]}
                       >
-                        {item.title}
-                      </Text>
-                      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                        {c}/{item.target}
-                      </Text>
-                    </View>
-                    {done ? (
-                      <Check size={18} color={colors.success} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              color: colors.text,
+                              fontWeight: '600',
+                              fontSize: 14,
+                            }}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                            {c}/{item.target}
+                          </Text>
+                        </View>
+                        {done ? (
+                          <Check size={18} color={colors.success} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -658,46 +755,17 @@ export default function CounterScreen() {
                 <Text style={{ color: '#020617', fontWeight: '700' }}>Continue</Text>
               </Pressable>
             </View>
-          </Card>
-        </View>
-      </Modal>
-
-      {/* Manual entry */}
-      <Modal visible={showManual} transparent animationType="slide">
-        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <Card style={{ marginHorizontal: 24 }}>
-            <Title style={{ fontSize: 20 }}>Set count</Title>
-            <TextInput
-              value={manualValue}
-              onChangeText={setManualValue}
-              keyboardType="number-pad"
-              placeholder="Enter number"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.inputBg,
-                  color: colors.text,
-                  borderColor: colors.cardBorder,
-                },
-              ]}
-            />
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-              <Pressable
-                onPress={() => setShowManual(false)}
-                style={[styles.modalBtn, { flex: 1, backgroundColor: colors.inputBg }]}
-              >
-                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={applyManual}
-                style={[styles.modalBtn, { flex: 1, backgroundColor: colors.gold }]}
-              >
-                <Text style={{ color: '#020617', fontWeight: '700' }}>Apply</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => {
+                setShowCompletion(false);
+                setPrayerMode(null);
+              }}
+              style={styles.doneBtn}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                Done
+              </Text>
+            </Pressable>
           </Card>
         </View>
       </Modal>
@@ -798,9 +866,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 2,
   },
-  counterWrap: {
+  counterArea: {
+    position: 'relative',
     alignItems: 'center',
     marginVertical: 16,
+  },
+  ringSvgWrap: {
+    position: 'absolute',
+    left: -16,
+    top: -16,
+    width: RING_SVG_SIZE,
+    height: RING_SVG_SIZE,
+  },
+  counterWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cycleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  cycleLine: {
+    width: 32,
+    height: 1,
+  },
+  adhkarListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 4,
   },
   ringOuter: {
     width: 240,
@@ -855,12 +952,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  input: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+  doneBtn: {
+    marginTop: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
   },
 });
