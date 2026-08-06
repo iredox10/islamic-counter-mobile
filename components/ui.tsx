@@ -9,6 +9,7 @@ import {
   type StyleProp,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
+import { FONTS } from '@/lib/fonts';
 
 export function Screen({
   children,
@@ -151,10 +152,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
+    fontFamily: FONTS.serif,
   },
   subtitle: {
     fontSize: 14,
     marginTop: 4,
+    fontFamily: FONTS.sans,
   },
   goldBtn: {
     flexDirection: 'row',
@@ -169,6 +172,7 @@ const styles = StyleSheet.create({
     color: '#020617',
     fontWeight: '700',
     fontSize: 15,
+    fontFamily: FONTS.sansBold,
   },
   chip: {
     paddingHorizontal: 14,

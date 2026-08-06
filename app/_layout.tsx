@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import 'react-native-reanimated';
 
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -15,16 +16,31 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync();
 
+const FONT_MAP = {
+  Cinzel: require('../assets/fonts/Cinzel-Regular.ttf'),
+  'Cinzel-SemiBold': require('../assets/fonts/Cinzel-SemiBold.ttf'),
+  'Cinzel-Bold': require('../assets/fonts/Cinzel-Bold.ttf'),
+  Lato: require('../assets/fonts/Lato-Regular.ttf'),
+  LatoBold: require('../assets/fonts/Lato-Bold.ttf'),
+} as const;
+
+type FontName = keyof typeof FONT_MAP;
+
+export function useAppFonts() {
+  return useFonts(FONT_MAP);
+}
+
 export default function RootLayout() {
   const dbReady = useDatabaseReady();
+  const [fontsLoaded] = useAppFonts();
 
   useEffect(() => {
-    if (dbReady) {
+    if (dbReady && fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [dbReady]);
+  }, [dbReady, fontsLoaded]);
 
-  if (!dbReady) return null;
+  if (!dbReady || !fontsLoaded) return null;
 
   return (
     <ThemeProvider>

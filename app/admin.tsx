@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Text from '@/components/AppText';
 import { ChevronLeft, Database, ShieldCheck, RefreshCw, Send, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 

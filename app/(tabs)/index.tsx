@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  Text,
+  Text as RNNativeText,
   Pressable,
   StyleSheet,
   ScrollView,
   Modal,
   Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -59,6 +58,7 @@ import { useAchievementTracker } from '@/lib/useAchievementTracker';
 import { shareProgress } from '@/lib/share';
 import { AchievementToast } from '@/components/AchievementToast';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
+import { FONTS } from '@/lib/fonts';
 
 const MULTI_PRESET = [
   { name: 'SubhanAllah', arabic: 'سُبْحَانَ اللَّهِ', target: 33 },
@@ -66,13 +66,17 @@ const MULTI_PRESET = [
   { name: 'Allahu Akbar', arabic: 'اللَّهُ أَكْبَرُ', target: 33 },
 ];
 
+function Text({ style, ...props }: React.ComponentProps<typeof RNNativeText>) {
+  return (
+    <RNNativeText {...props} style={[{ fontFamily: FONTS.sans }, style]} />
+  );
+}
+
 const RING_SIZE = 272; // outer svg viewport
 const RING_RADIUS = 126; // ring circle radius
 const RING_STROKE = 3; // web uses a thin 2px hairline ring
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const BUTTON_SIZE = 244; // inner tappable round button
-
-const serif = Platform.select({ ios: 'Georgia', android: 'serif' });
 
 export default function CounterScreen() {
   const { colors } = useTheme();
@@ -911,7 +915,7 @@ function StatPill() {
   return null;
 }
 
-const serifStyle = { fontFamily: serif } as const;
+const serifStyle = { fontFamily: FONTS.serif } as const;
 
 const styles = StyleSheet.create({
   scroll: {
@@ -929,11 +933,13 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     textTransform: 'uppercase',
     fontWeight: '600',
+    fontFamily: FONTS.serif,
   },
   todayCount: {
     fontSize: 34,
     fontWeight: '700',
     marginTop: 2,
+    fontFamily: FONTS.serif,
   },
   streakRow: {
     flexDirection: 'row',
@@ -1014,7 +1020,6 @@ const styles = StyleSheet.create({
   },
   bigCount: {
     fontSize: 72,
-    fontWeight: '700',
     letterSpacing: -3,
     marginVertical: 6,
   },

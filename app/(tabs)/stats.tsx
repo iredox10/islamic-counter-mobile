@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   View,
-  Text,
   Pressable,
   StyleSheet,
   ScrollView,
   TextInput,
   Modal,
 } from 'react-native';
+import Text from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, subDays } from 'date-fns';
 import { Plus, Flame, Check, Circle } from 'lucide-react-native';

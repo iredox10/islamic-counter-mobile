@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
+import Text from './AppText';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { Trophy, X } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
