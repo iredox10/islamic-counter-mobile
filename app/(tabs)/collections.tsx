@@ -21,7 +21,12 @@ import {
   ChevronLeft,
   History,
   Flame,
+  Languages,
+  Timer,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -42,6 +47,11 @@ import {
 } from '@/lib/adhkarTracking';
 import type { AdhkarStreak } from '@/lib/types';
 
+const RING_RADIUS = 96;
+const RING_STROKE = 10;
+const RING_SVG_SIZE = 208;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 const categoryIcons: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   morning: Sun,
   evening: Moon,
@@ -58,6 +68,12 @@ const categoryColors: Record<string, string> = {
   general: '#D4AF37',
 };
 
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
 export default function CollectionsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -68,9 +84,25 @@ export default function CollectionsScreen() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [itemCount, setItemCount] = useState(0);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [showAdhkarList, setShowAdhkarList] = useState(true);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [streak, setStreak] = useState<AdhkarStreak | null>(null);
+  const [duration, setDuration] = useState(0);
   const [showDone, setShowDone] = useState(false);
+
+  useEffect(() => {
+    if (!sessionStarted) {
+      setDuration(0);
+      return;
+    }
+    const id = setInterval(() => {
+      const session = getCurrentSession();
+      if (session) {
+        setDuration(Math.floor((Date.now() - session.startedAt.getTime()) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [sessionStarted]);
 
   const getProgress = (collectionId: string, itemIndex: number) => {
     const rec = progress.find(
@@ -92,7 +124,9 @@ export default function CollectionsScreen() {
   const openCollection = async (collection: AdhkarCollection) => {
     setSelected(collection);
     setActiveIndex(null);
+    setShowAdhkarList(true);
     setSessionStarted(false);
+    setDuration(0);
     const s = await getStreak(collection.id);
     setStreak(s ?? null);
   };
@@ -148,12 +182,14 @@ export default function CollectionsScreen() {
     setSelected(null);
     setActiveIndex(null);
     setSessionStarted(false);
+    setDuration(0);
   };
 
   // Active counting view
   if (selected && activeIndex !== null) {
     const item = selected.items[activeIndex];
     const pct = Math.min(100, (itemCount / item.target) * 100);
+    const canShowList = showAdhkarList;
 
     return (
       <Screen>
@@ -172,43 +208,161 @@ export default function CollectionsScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.activeBody}>
-            <Text style={[styles.itemTitle, { color: colors.gold }]}>{item.title}</Text>
-            {item.arabic ? (
-              <Text style={[styles.arabic, { color: colors.text }]}>{item.arabic}</Text>
-            ) : null}
-            {showTranslation ? (
-              <Text style={[styles.meaning, { color: colors.textSecondary }]}>
-                {item.meaning}
+          {(sessionStarted && duration > 0) || (streak && streak.currentStreak > 0) ? (
+            <View style={styles.activeInfoRow}>
+              {sessionStarted && duration > 0 ? (
+                <View style={[styles.infoPill, { backgroundColor: colors.inputBg }]}>
+                  <Timer size={12} color={colors.textSecondary} />
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    {formatDuration(duration)}
+                  </Text>
+                </View>
+              ) : null}
+              {streak && streak.currentStreak > 0 ? (
+                <View style={[styles.infoPill, { backgroundColor: colors.inputBg }]}>
+                  <Flame size={12} color={colors.gold} />
+                  <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '600' }}>
+                    {streak.currentStreak} day streak
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <ScrollView
+            contentContainerStyle={styles.activeBody}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.contextLine, { color: colors.textMuted }]}>
+                {selected.title} • {activeIndex + 1}/{selected.items.length}
               </Text>
-            ) : null}
-            {item.virtue ? (
-              <Text style={[styles.virtue, { color: colors.textMuted }]}>
-                {item.virtue}
-              </Text>
+              <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
+              {item.arabic ? (
+                <Text style={[styles.arabic, { color: colors.gold }]}>{item.arabic}</Text>
+              ) : null}
+              {showTranslation ? (
+                <Text style={[styles.meaning, { color: colors.textSecondary }]}>
+                  {item.meaning}
+                </Text>
+              ) : null}
+            </View>
+
+            {showTranslation && item.virtue ? (
+              <View style={styles.virtueBox}>
+                <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
+                  ✨ {item.virtue}
+                </Text>
+              </View>
             ) : null}
 
-            <Pressable onPress={handleIncrement} style={styles.countCircle}>
-              <View
-                style={[
-                  styles.countOuter,
-                  { borderColor: colors.gold, backgroundColor: colors.card },
-                ]}
-              >
-                <Text style={[styles.countNum, { color: colors.gold }]}>{itemCount}</Text>
-                <Text style={{ color: colors.textMuted }}>/ {item.target}</Text>
-                <View style={[styles.bar, { backgroundColor: colors.inputBg }]}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      { width: `${pct}%`, backgroundColor: colors.gold },
-                    ]}
+            <View style={styles.ringArea}>
+              <View pointerEvents="none" style={styles.ringSvgWrap}>
+                <Svg width={RING_SVG_SIZE} height={RING_SVG_SIZE}>
+                  <SvgCircle
+                    cx={RING_SVG_SIZE / 2}
+                    cy={RING_SVG_SIZE / 2}
+                    r={RING_RADIUS}
+                    stroke={colors.cardBorder}
+                    strokeWidth={RING_STROKE}
+                    fill="none"
                   />
-                </View>
+                  <SvgCircle
+                    cx={RING_SVG_SIZE / 2}
+                    cy={RING_SVG_SIZE / 2}
+                    r={RING_RADIUS}
+                    stroke={colors.gold}
+                    strokeWidth={RING_STROKE}
+                    fill="none"
+                    strokeLinecap="round"
+                    rotation={-90}
+                    originX={RING_SVG_SIZE / 2}
+                    originY={RING_SVG_SIZE / 2}
+                    strokeDasharray={RING_CIRCUMFERENCE}
+                    strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct / 100)}
+                  />
+                </Svg>
               </View>
-            </Pressable>
+              <Pressable
+                onPress={handleIncrement}
+                style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
+              >
+                <View
+                  style={[
+                    styles.countOuter,
+                    { borderColor: colors.gold, backgroundColor: colors.card },
+                  ]}
+                >
+                  <Text style={[styles.countNum, { color: colors.gold }]}>{itemCount}</Text>
+                  <Text style={{ color: colors.textMuted }}>/ {item.target}</Text>
+                </View>
+              </Pressable>
+            </View>
             <Text style={{ color: colors.textMuted, marginTop: 12 }}>Tap to count</Text>
-          </View>
+
+            <Pressable
+              onPress={() => setShowAdhkarList(!canShowList)}
+              style={styles.listToggle}
+            >
+              <Text style={{ color: colors.textMuted, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {canShowList ? 'Hide' : 'Show'} adhkar list
+              </Text>
+              {canShowList ? (
+                <ChevronUp size={14} color={colors.textMuted} />
+              ) : (
+                <ChevronDown size={14} color={colors.textMuted} />
+              )}
+            </Pressable>
+
+            {canShowList ? (
+              <View style={styles.pillsWrap}>
+                {selected.items.map((it, idx) => {
+                  const p = getProgress(selected.id, idx);
+                  const complete = p >= it.target;
+                  const isActive = idx === activeIndex;
+                  return (
+                    <Pressable
+                      key={`${it.title}-${idx}`}
+                      onPress={() => {
+                        setActiveIndex(idx);
+                        setItemCount(p);
+                      }}
+                      style={[
+                        styles.pill,
+                        {
+                          backgroundColor: isActive
+                            ? colors.goldMuted
+                            : complete
+                              ? 'rgba(16,185,129,0.1)'
+                              : colors.inputBg,
+                          borderColor: isActive
+                            ? colors.gold
+                            : complete
+                              ? colors.success
+                              : colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: isActive
+                            ? colors.gold
+                            : complete
+                              ? colors.success
+                              : colors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {it.title.length > 10 ? `${it.title.substring(0, 10)}…` : it.title}
+                      </Text>
+                      {complete ? <Check size={12} color={colors.success} /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </ScrollView>
         </SafeAreaView>
       </Screen>
     );
@@ -228,7 +382,23 @@ export default function CollectionsScreen() {
                 <Title style={{ fontSize: 22 }}>{selected.title}</Title>
                 <Subtitle>{selected.description}</Subtitle>
               </View>
+              <Pressable
+                onPress={() => setShowTranslation((v) => !v)}
+                style={[styles.iconBtn, { backgroundColor: showTranslation ? colors.goldMuted : colors.inputBg }]}
+              >
+                <Languages size={18} color={showTranslation ? colors.gold : colors.textMuted} />
+              </Pressable>
             </View>
+
+            <Pressable
+              onPress={() => router.push('/history')}
+              style={styles.historyLink}
+            >
+              <History size={15} color={colors.gold} />
+              <Text style={{ color: colors.gold, fontSize: 13, fontWeight: '600' }}>
+                View History
+              </Text>
+            </Pressable>
 
             {streak && streak.currentStreak > 0 ? (
               <View
@@ -255,24 +425,57 @@ export default function CollectionsScreen() {
                     style={[
                       styles.itemRow,
                       {
-                        backgroundColor: colors.card,
-                        borderColor: done ? colors.success : colors.cardBorder,
+                        backgroundColor: done ? colors.goldMuted : colors.card,
+                        borderColor: done ? colors.gold : colors.cardBorder,
                       },
                     ]}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontWeight: '600' }}>
-                        {item.title}
-                      </Text>
-                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                        {c}/{item.target}
-                      </Text>
+                      <View style={styles.itemTitleRow}>
+                        <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+                          {index + 1}.
+                        </Text>
+                        <Text
+                          style={{
+                            color: done ? colors.gold : colors.text,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {item.title}
+                        </Text>
+                        {done ? <Check size={14} color={colors.gold} /> : null}
+                      </View>
+                      {item.arabic ? (
+                        <Text style={[styles.itemArabic, { color: colors.gold }]}>
+                          {item.arabic}
+                        </Text>
+                      ) : null}
+                      {showTranslation ? (
+                        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                          {item.meaning}
+                        </Text>
+                      ) : null}
+                      <View style={[styles.bar, { backgroundColor: colors.inputBg, marginTop: 8 }]}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            {
+                              width: `${Math.min(100, (c / item.target) * 100)}%`,
+                              backgroundColor: colors.gold,
+                            },
+                          ]}
+                        />
+                      </View>
                     </View>
-                    {done ? (
-                      <Check size={18} color={colors.success} />
-                    ) : (
-                      <ChevronRight size={18} color={colors.textMuted} />
-                    )}
+                    <Text
+                      style={{
+                        color: done ? colors.gold : colors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {Math.min(c, item.target)} / {item.target}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -342,12 +545,7 @@ export default function CollectionsScreen() {
                     },
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.iconWrap,
-                      { backgroundColor: `${accent}22` },
-                    ]}
-                  >
+                  <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
                     <Icon size={22} color={accent} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -435,11 +633,25 @@ const styles = StyleSheet.create({
   backBtn: {
     padding: 4,
   },
+  iconBtn: {
+    height: 40,
+    width: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
   streakBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 12,
     padding: 12,
     borderRadius: 12,
@@ -448,20 +660,54 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
   },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  itemArabic: {
+    fontSize: 17,
+    textAlign: 'left',
+    marginTop: 6,
+    lineHeight: 28,
+    writingDirection: 'rtl',
+  },
   activeBody: {
-    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  infoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  activeInfoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    gap: 8,
+    paddingVertical: 8,
+  },
+  contextLine: {
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    fontWeight: '700',
   },
   itemTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
+    marginTop: 6,
   },
   arabic: {
     fontSize: 24,
@@ -476,14 +722,27 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 20,
   },
-  virtue: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
+  virtueBox: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.2)',
+    backgroundColor: 'rgba(16,185,129,0.1)',
   },
-  countCircle: {
-    marginTop: 32,
+  ringArea: {
+    position: 'relative',
+    alignItems: 'center',
+    marginTop: 36,
+    width: 180,
+    height: 180,
+  },
+  ringSvgWrap: {
+    position: 'absolute',
+    width: RING_SVG_SIZE,
+    height: RING_SVG_SIZE,
+    left: (180 - RING_SVG_SIZE) / 2,
+    top: (180 - RING_SVG_SIZE) / 2,
   },
   countOuter: {
     width: 180,
@@ -494,8 +753,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   countNum: {
-    fontSize: 48,
+    fontSize: 52,
     fontWeight: '700',
+  },
+  listToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 14,
+  },
+  pillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: 8,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   modalOverlay: {
     flex: 1,
