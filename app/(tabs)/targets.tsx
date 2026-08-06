@@ -38,6 +38,10 @@ import { ADHKAR_PRESETS } from '@/lib/adhkar';
 import { KEYS } from '@/hooks/useSettings';
 import { shareProgress } from '@/lib/share';
 import type { Target } from '@/lib/types';
+import {
+  scheduleGoalReminders,
+  cancelGoalReminders,
+} from '@/lib/goalReminders';
 
 const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const GAP_OPTIONS: { value: number | null; label: string }[] = [
@@ -156,7 +160,8 @@ export default function TargetsScreen() {
       payload.reminderDays = frequency === 'weekly' ? selectedDays : undefined;
     }
 
-    await addTarget(payload as Omit<Target, 'id'>);
+    const created = await addTarget(payload as Omit<Target, 'id'>);
+    await scheduleGoalReminders(created);
     resetForm();
     setShowForm(false);
   };
@@ -170,12 +175,16 @@ export default function TargetsScreen() {
   };
 
   const handleDelete = (id: number) => {
+    const target = targets.find((t) => t.id === id);
     Alert.alert('Delete goal?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => deleteTarget(id),
+        onPress: async () => {
+          if (target) await cancelGoalReminders(target);
+          await deleteTarget(id);
+        },
       },
     ]);
   };

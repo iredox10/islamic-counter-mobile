@@ -18,6 +18,7 @@ export interface Target {
   frequency?: 'daily' | 'weekly';
   reminderTime?: string;
   reminderDays?: number[];
+  notificationIds?: string[];
   lastNotified?: string;
   createdAt: string;
   status: 'active' | 'completed' | 'archived';
