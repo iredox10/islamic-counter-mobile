@@ -23,6 +23,7 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -72,11 +73,12 @@ function Text({ style, ...props }: React.ComponentProps<typeof RNNativeText>) {
   );
 }
 
-const RING_SIZE = 272; // outer svg viewport
-const RING_RADIUS = 126; // ring circle radius
-const RING_STROKE = 3; // web uses a thin 2px hairline ring
+const RING_SIZE = 320; // outer svg viewport: button 288px + ring drawn around
+const RING_RADIUS = 48; // web: viewBox 0 0 100 100, circle r=48 (relative to 100)
+const RING_VIEWBOX = 100; // matches web's w-72 button scaled to the same viewBox
+const RING_STROKE = 2; // web iris thin 2px hairline ring
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const BUTTON_SIZE = 244; // inner tappable round button
+const BUTTON_SIZE = 288; // web: w-72 h-72 rounded-full button
 
 export default function CounterScreen() {
   const { colors } = useTheme();
@@ -533,67 +535,61 @@ export default function CounterScreen() {
                 { width: RING_SIZE, height: RING_SIZE },
               ]}
             >
-              <Svg width={RING_SIZE} height={RING_SIZE}>
+              <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}>
                 <SvgCircle
-                  cx={RING_SIZE / 2}
-                  cy={RING_SIZE / 2}
+                  cx={RING_VIEWBOX / 2}
+                  cy={RING_VIEWBOX / 2}
                   r={RING_RADIUS}
                   stroke={colors.cardBorder}
                   strokeWidth={RING_STROKE}
                   fill="none"
                 />
                 <SvgCircle
-                  cx={RING_SIZE / 2}
-                  cy={RING_SIZE / 2}
+                  cx={RING_VIEWBOX / 2}
+                  cy={RING_VIEWBOX / 2}
                   r={RING_RADIUS}
                   stroke={colors.gold}
                   strokeWidth={RING_STROKE}
                   fill="none"
                   strokeLinecap="round"
                   rotation={-90}
-                  originX={RING_SIZE / 2}
-                  originY={RING_SIZE / 2}
+                  originX={RING_VIEWBOX / 2}
+                  originY={RING_VIEWBOX / 2}
                   strokeDasharray={RING_CIRCUMFERENCE}
                   strokeDashoffset={
                     RING_CIRCUMFERENCE * (1 - Math.min(100, progress) / 100)
                   }
                 />
               </Svg>
-            </View>
 
-            <Pressable
-              onPress={handleTap}
-              style={({ pressed }) => [
-                styles.button,
-                {
-                  backgroundColor: ripple ? colors.goldMuted : 'transparent',
-                  transform: [{ scale: pressed || ripple ? 0.98 : 1 }],
-                },
-              ]}
-            >
-              {/* gradient illusion stack */}
-              <View
-                style={[
-                  styles.buttonHalo,
-                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                ]}
+              {/* the button */}
+              <LinearGradient
+                colors={['#1e293b', '#020617']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.button, ripple && styles.buttonPressed]}
               >
-                <View
-                  style={[
+                <Pressable
+                  onPress={handleTap}
+                  style={({ pressed }) => [
                     styles.buttonInner,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.gold,
-                    },
+                    { transform: [{ scale: pressed || ripple ? 0.98 : 1 }] },
                   ]}
                 >
+                  {/* Inner Ring Glow */}
+                  <View
+                    style={[styles.innerRing, { borderColor: colors.cardBorder }]}
+                  />
+                  {/* Gold Accent Ring */}
+                  <View
+                    style={[
+                      styles.accentRing,
+                      { borderColor: colors.goldMuted },
+                    ]}
+                  />
+                  {/* Ripple */}
                   {ripple && (
-                    <View
-                      style={[
-                        styles.ripple,
-                        { backgroundColor: colors.goldMuted },
-                      ]}
-                    />
+                    <View style={[styles.ripple, { backgroundColor: colors.goldMuted }]} />
                   )}
                   <View style={styles.buttonContent}>
                     {counterContent}
@@ -607,9 +603,9 @@ export default function CounterScreen() {
                       {displayLabel}
                     </Text>
                   </View>
-                </View>
-              </View>
-            </Pressable>
+                </Pressable>
+              </LinearGradient>
+            </View>
 
             {/* Cycle / Goal indicator */}
             {!progressMode && !multiMode && (
@@ -976,38 +972,60 @@ const styles = StyleSheet.create({
   },
   ringSvgWrap: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   button: {
     position: 'absolute',
+    top: (RING_SIZE - BUTTON_SIZE) / 2,
+    left: (RING_SIZE - BUTTON_SIZE) / 2,
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 20, height: 20 },
+    shadowOpacity: 0.6,
+    shadowRadius: 60,
+    elevation: 10,
+  },
+  buttonPressed: {
+    shadowOffset: { width: 10, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+  },
+  buttonInner: {
+    width: '100%',
+    height: '100%',
     borderRadius: BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonHalo: {
-    width: BUTTON_SIZE - 2,
-    height: BUTTON_SIZE - 2,
-    borderRadius: (BUTTON_SIZE - 2) / 2,
+  innerRing: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    borderRadius: (BUTTON_SIZE - 16) / 2,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  buttonInner: {
-    width: BUTTON_SIZE - 22,
-    height: BUTTON_SIZE - 22,
-    borderRadius: (BUTTON_SIZE - 22) / 2,
+  accentRing: {
+    position: 'absolute',
+    top: 24,
+    left: 24,
+    right: 24,
+    bottom: 24,
+    borderRadius: (BUTTON_SIZE - 48) / 2,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
   ripple: {
     position: 'absolute',
-    inset: 0,
-    borderRadius: 999,
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+    borderRadius: BUTTON_SIZE / 2,
   },
   buttonContent: {
     alignItems: 'center',
