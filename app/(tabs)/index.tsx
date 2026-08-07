@@ -23,7 +23,13 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react-native';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import Svg, {
+  Circle as SvgCircle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Rect,
+} from 'react-native-svg';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -79,6 +85,17 @@ const RING_VIEWBOX = 100; // matches web's w-72 button scaled to the same viewBo
 const RING_STROKE = 2; // web iris thin 2px hairline ring
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const BUTTON_SIZE = 288; // web: w-72 h-72 rounded-full button
+const WEB_GOLD = '#fbbf24'; // web gold-400 (counter number, active states)
+const WEB_GOLD_500 = '#f59e0b'; // web gold-500 (progress ring)
+const WEB_GOLD_GLOW = 'rgba(245,158,11,0.5)'; // web shadow glow on progress ring
+const WEB_SLATE_800 = '#1e293b'; // web midnight-800 (button top gradient)
+const WEB_SLATE_950 = '#020617'; // web midnight-950 (button bottom gradient)
+const WEB_SLATE_700 = '#334155'; // web slate-700 (hairline line)
+const WEB_SLATE_400 = '#94a3b8'; // web slate-400
+const WEB_SLATE_500 = '#64748b'; // web slate-500
+const WEB_SLATE_300 = '#cbd5e1'; // web slate-300
+const WEB_EMERALD_400 = '#34d399'; // web emerald-400
+const WEB_WHITE_5 = 'rgba(255,255,255,0.05)'; // web border-white/5
 
 export default function CounterScreen() {
   const { colors } = useTheme();
@@ -408,7 +425,7 @@ export default function CounterScreen() {
   const counterContent = progressMode ? (
     <>
       <Text
-        style={[styles.dhikrArabic, { color: colors.gold, writingDirection: 'rtl' }]}
+        style={[styles.dhikrArabicSm, { color: colors.gold, opacity: 0.7, writingDirection: 'rtl' }]}
         numberOfLines={1}
       >
         {displayArabic}
@@ -426,7 +443,7 @@ export default function CounterScreen() {
     </>
   ) : multiMode ? (
     <>
-      <Text style={[styles.dhikrArabic, { color: colors.gold, writingDirection: 'rtl' }]}>
+      <Text style={[styles.dhikrArabic, { color: colors.gold, opacity: 0.7, writingDirection: 'rtl' }]}>
         {MULTI_PRESET[activeCounterIndex].arabic}
       </Text>
       <Text
@@ -442,7 +459,7 @@ export default function CounterScreen() {
     </>
   ) : (
     <Text
-      style={[styles.bigCount, serifStyle, { color: colors.gold }]}
+      style={[styles.bigCountSingle, serifStyle, { color: colors.gold }]}
       adjustsFontSizeToFit
       numberOfLines={1}
     >
@@ -465,14 +482,14 @@ export default function CounterScreen() {
           {/* ── Top Bar: Today total + streak, sound toggle ───────────── */}
           <View style={styles.topBar}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.todayLabel, { color: colors.textMuted }]}>Today</Text>
-              <Text style={[styles.todayCount, serifStyle, { color: colors.text }]}>
+              <Text style={[styles.todayLabel, { color: colors.textSecondary }]}>Today</Text>
+              <Text style={[styles.todayCount, serifStyle, { color: '#ffffff' }]}>
                 {todayTotal.toLocaleString()}
               </Text>
               {currentStreak > 0 && (
                 <View style={styles.streakRow}>
-                  <Flame size={14} color="#fbbf24" />
-                  <Text style={{ color: '#fbbf24', fontSize: 12, fontWeight: '600' }}>
+                  <Flame size={14} color="#fb923c" />
+                  <Text style={{ color: '#fb923c', fontSize: 12, fontWeight: '500' }}>
                     {currentStreak} day streak
                   </Text>
                 </View>
@@ -483,8 +500,8 @@ export default function CounterScreen() {
               style={[
                 styles.iconBtn,
                 {
-                  backgroundColor: colors.inputBg,
-                  borderColor: colors.cardBorder,
+                  backgroundColor: 'rgba(30, 41, 59, 0.30)',
+                  borderColor: 'rgba(255,255,255,0.05)',
                 },
               ]}
             >
@@ -504,8 +521,8 @@ export default function CounterScreen() {
                 style={[
                   styles.prayerPill,
                   {
-                    backgroundColor: prayerMode ? colors.goldMuted : colors.inputBg,
-                    borderColor: prayerMode ? colors.gold : colors.cardBorder,
+                    backgroundColor: prayerMode ? 'rgba(245,158,11,0.20)' : 'rgba(30, 41, 59, 0.30)',
+                    borderColor: prayerMode ? 'rgba(245,158,11,0.30)' : 'rgba(255,255,255,0.05)',
                   },
                 ]}
               >
@@ -517,7 +534,7 @@ export default function CounterScreen() {
                   style={{
                     color: prayerMode ? colors.gold : colors.textSecondary,
                     fontSize: 12,
-                    fontWeight: '600',
+                    fontWeight: '500',
                   }}
                 >
                   {prayerLabel}
@@ -535,10 +552,10 @@ export default function CounterScreen() {
                 {specialDay && (
                   <Text
                     style={{
-                      color: colors.success,
+                      color: '#6ee7b7',
                       fontSize: 10,
                       fontWeight: '700',
-                      backgroundColor: 'rgba(16,185,129,0.2)',
+                      backgroundColor: 'rgba(16,185,129,0.20)',
                       paddingHorizontal: 8,
                       paddingVertical: 2,
                       borderRadius: 12,
@@ -581,7 +598,7 @@ export default function CounterScreen() {
                     cx={RING_VIEWBOX / 2}
                     cy={RING_VIEWBOX / 2}
                     r={RING_RADIUS}
-                    stroke={colors.cardBorder}
+                    stroke={WEB_SLATE_800}
                     strokeWidth={RING_STROKE}
                     fill="none"
                   />
@@ -589,7 +606,7 @@ export default function CounterScreen() {
                     cx={RING_VIEWBOX / 2}
                     cy={RING_VIEWBOX / 2}
                     r={RING_RADIUS}
-                    stroke={colors.gold}
+                    stroke={WEB_GOLD_500}
                     strokeWidth={RING_STROKE}
                     fill="none"
                     strokeLinecap="round"
@@ -605,7 +622,34 @@ export default function CounterScreen() {
               </View>
 
               {/* the button */}
-              <View style={[styles.button, { backgroundColor: colors.backgroundSecondary }, ripple && styles.buttonPressed]}>
+              <View style={[styles.button, ripple && styles.buttonPressed]}>
+                <Svg
+                  style={StyleSheet.absoluteFill}
+                  width={BUTTON_SIZE}
+                  height={BUTTON_SIZE}
+                  viewBox="0 0 100 100"
+                >
+                  <Defs>
+                    <SvgLinearGradient
+                      id="btnGrad"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <Stop offset="0" stopColor={WEB_SLATE_800} />
+                      <Stop offset="1" stopColor={WEB_SLATE_950} />
+                    </SvgLinearGradient>
+                  </Defs>
+                  <Rect
+                    x="0"
+                    y="0"
+                    width="100"
+                    height="100"
+                    rx="50"
+                    fill="url(#btnGrad)"
+                  />
+                </Svg>
                 <Pressable
                   onPress={handleTap}
                   onLongPress={() => {
@@ -620,18 +664,18 @@ export default function CounterScreen() {
                 >
                   {/* Inner Ring Glow */}
                   <View
-                    style={[styles.innerRing, { borderColor: colors.cardBorder }]}
+                    style={[styles.innerRing, { borderColor: 'rgba(255,255,255,0.05)' }]}
                   />
                   {/* Gold Accent Ring */}
                   <View
                     style={[
                       styles.accentRing,
-                      { borderColor: colors.goldMuted },
+                      { borderColor: 'rgba(245,158,11,0.10)' },
                     ]}
                   />
                   {/* Ripple */}
                   {ripple && (
-                    <View style={[styles.ripple, { backgroundColor: colors.goldMuted }]} />
+                    <View style={[styles.ripple, { backgroundColor: 'rgba(251,191,36,0.10)' }]} />
                   )}
                   <View style={styles.buttonContent}>
                     {counterContent}
@@ -654,17 +698,17 @@ export default function CounterScreen() {
               <View style={styles.cycleRow}>
                 <Text
                   style={{
-                    color: colors.textMuted,
-                    fontSize: 10,
-                    letterSpacing: 2,
+                    color: WEB_SLATE_400,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
                     textTransform: 'uppercase',
-                    fontWeight: '600',
+                    fontWeight: '500',
                   }}
                 >
                   {activeTarget ? 'Goal' : 'Cycle'}
                 </Text>
-                <View style={[styles.cycleLine, { backgroundColor: colors.cardBorder }]} />
-                <Text style={{ color: colors.gold, fontSize: 11, fontWeight: '700' }}>
+                <View style={[styles.cycleLine, { backgroundColor: WEB_SLATE_700 }]} />
+                <Text style={{ color: WEB_GOLD_500, fontSize: 12, fontWeight: '600' }}>
                   {activeTarget
                     ? `${activeTarget.currentCount}/${activeTarget.targetCount}`
                     : `${count % 33}/33`}
@@ -680,13 +724,13 @@ export default function CounterScreen() {
                 onPress={() => setShowAdhkarList(!showAdhkarList)}
                 style={styles.adhkarToggleRow}
               >
-                <Text style={{ color: colors.textMuted, fontSize: 10 }}>
+                <Text style={{ color: WEB_SLATE_500, fontSize: 10 }}>
                   {showAdhkarList ? 'Hide' : 'Show'} adhkar list
                 </Text>
                 {showAdhkarList ? (
-                  <ChevronUp size={12} color={colors.textMuted} />
+                  <ChevronUp size={12} color={WEB_SLATE_500} />
                 ) : (
-                  <ChevronDown size={12} color={colors.textMuted} />
+                  <ChevronDown size={12} color={WEB_SLATE_500} />
                 )}
               </Pressable>
               {showAdhkarList && (
@@ -700,18 +744,18 @@ export default function CounterScreen() {
                         key={`${item.title}-${idx}`}
                         onPress={() => setActiveAdhkarIndex(idx)}
                         style={[
-                          styles.pill,
+                        styles.pill,
                           {
                             backgroundColor: active
-                              ? colors.goldMuted
+                              ? 'rgba(245,158,11,0.20)'
                               : done
-                                ? 'rgba(16,185,129,0.12)'
-                                : colors.inputBg,
+                                ? 'rgba(16,185,129,0.10)'
+                                : 'rgba(30, 41, 59, 0.30)',
                             borderColor: active
-                              ? colors.gold
+                              ? 'rgba(245,158,11,0.30)'
                               : done
-                                ? colors.success
-                                : colors.cardBorder,
+                                ? 'rgba(16,185,129,0.20)'
+                                : 'rgba(255,255,255,0.05)',
                           },
                         ]}
                       >
@@ -743,17 +787,17 @@ export default function CounterScreen() {
                         styles.multiTab,
                         {
                           backgroundColor:
-                            activeCounterIndex === idx ? colors.goldMuted : colors.inputBg,
+                            activeCounterIndex === idx ? 'rgba(245,158,11,0.20)' : 'rgba(30, 41, 59, 0.30)',
                           borderColor:
-                            activeCounterIndex === idx ? colors.gold : colors.cardBorder,
+                            activeCounterIndex === idx ? 'rgba(245,158,11,0.30)' : 'rgba(255,255,255,0.05)',
                         },
                       ]}
                     >
-                      <Text style={{ color: colors.gold, fontSize: 10 }}>{item.arabic}</Text>
+                      <Text style={{ color: 'rgba(251,191,36,0.80)', fontSize: 10 }}>{item.arabic}</Text>
                       <Text
                         style={{
-                          color: done ? colors.success : colors.textSecondary,
-                          fontSize: 12,
+                          color: done ? WEB_EMERALD_400 : WEB_SLATE_300,
+                          fontSize: 14,
                           fontWeight: '700',
                         }}
                       >
@@ -771,17 +815,17 @@ export default function CounterScreen() {
             onPress={handleReset}
             style={({ pressed }) => [
               styles.resetBtn,
-              pressed && { backgroundColor: colors.inputBg },
+              pressed && { backgroundColor: 'rgba(30, 41, 59, 0.30)' },
             ]}
           >
-            <RotateCcw size={14} color={colors.textSecondary} />
+            <RotateCcw size={14} color={WEB_SLATE_500} />
             <Text
               style={{
-                color: colors.textSecondary,
-                fontSize: 11,
-                letterSpacing: 2,
+                color: WEB_SLATE_500,
+                fontSize: 12,
+                letterSpacing: 1.2,
                 textTransform: 'uppercase',
-                fontWeight: '600',
+                fontWeight: '500',
               }}
             >
               Reset
@@ -801,27 +845,27 @@ export default function CounterScreen() {
                     styles.trackerChip,
                     {
                       backgroundColor: isActive
-                        ? colors.goldMuted
+                        ? 'rgba(245,158,11,0.20)'
                         : isCompleted
-                          ? 'rgba(16,185,129,0.12)'
-                          : colors.inputBg,
+                          ? 'rgba(16,185,129,0.10)'
+                          : 'rgba(30, 41, 59, 0.30)',
                       borderColor: isActive
-                        ? colors.gold
+                        ? 'rgba(245,158,11,0.30)'
                         : isCompleted
-                          ? colors.success
-                          : colors.cardBorder,
+                          ? 'rgba(16,185,129,0.20)'
+                          : 'rgba(255,255,255,0.05)',
                     },
                   ]}
                 >
-                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+                  <Text style={{ color: WEB_SLATE_300, fontSize: 10 }}>
                     {prayer.arabicName}
                   </Text>
                   {isCompleted ? (
-                    <Check size={12} color={colors.success} />
+                    <Check size={12} color={WEB_EMERALD_400} />
                   ) : (
                     <Circle
                       size={12}
-                      color={isActive ? colors.gold : colors.textMuted}
+                      color={isActive ? colors.gold : WEB_SLATE_500}
                     />
                   )}
                 </Pressable>
@@ -1010,14 +1054,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   todayLabel: {
-    fontSize: 12,
-    letterSpacing: 3,
+    fontSize: 14,
+    letterSpacing: 2.8,
     textTransform: 'uppercase',
     fontWeight: '600',
     fontFamily: FONTS.serif,
   },
   todayCount: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: '700',
     marginTop: 2,
     fontFamily: FONTS.serif,
@@ -1068,9 +1112,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#050812',
     shadowOffset: { width: 20, height: 20 },
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.8,
     shadowRadius: 60,
     elevation: 10,
   },
@@ -1121,27 +1167,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  dhikrArabicSm: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   bigCount: {
     fontSize: 72,
     letterSpacing: -3,
     marginVertical: 6,
   },
+  bigCountSingle: {
+    fontSize: 96,
+    letterSpacing: -4,
+    marginVertical: 6,
+  },
   targetText: {
-    fontSize: 14,
+    fontSize: 12,
+    color: WEB_SLATE_500,
   },
   dhikrLabel: {
-    fontSize: 11,
-    letterSpacing: 3,
+    fontSize: 12,
+    letterSpacing: 3.6,
     textTransform: 'uppercase',
-    fontWeight: '600',
-    marginTop: 10,
+    fontWeight: '500',
+    marginTop: 8,
   },
   cycleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    marginTop: 24,
+    gap: 8,
+    marginTop: 16,
   },
   cycleLine: {
     width: 32,
@@ -1167,16 +1224,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
   },
   multiTab: {
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     gap: 2,
   },
@@ -1185,10 +1242,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
     borderRadius: 24,
-    marginTop: 18,
+    marginTop: 16,
   },
   dailyTracker: {
     flexDirection: 'row',
@@ -1199,10 +1256,10 @@ const styles = StyleSheet.create({
   trackerChip: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    gap: 4,
+    gap: 2,
   },
   modalOverlay: {
     flex: 1,
@@ -1264,8 +1321,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    fontSize: 18,
-    fontFamily: FONTS.serif,
+    fontSize: 24,
     textAlign: 'center',
     color: '#fff',
   },

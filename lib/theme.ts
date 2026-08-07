@@ -1,9 +1,9 @@
 export const palette = {
   gold: {
-    300: '#E8C872',
-    400: '#D4AF37',
-    500: '#C9A227',
-    600: '#A8841A',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
   },
   midnight: {
     900: '#0f172a',
@@ -66,7 +66,7 @@ export const darkTheme: AppTheme = {
   textSecondary: palette.slate[400],
   textMuted: palette.slate[500],
   gold: palette.gold[400],
-  goldMuted: 'rgba(212, 175, 55, 0.15)',
+  goldMuted: 'rgba(245, 158, 11, 0.20)', // web gold-500/20
   tint: palette.gold[400],
   tabBar: 'rgba(15, 23, 42, 0.95)',
   tabBarBorder: 'rgba(255, 255, 255, 0.08)',
@@ -85,7 +85,7 @@ export const lightTheme: AppTheme = {
   textSecondary: palette.slate[600],
   textMuted: palette.slate[500],
   gold: palette.gold[600],
-  goldMuted: 'rgba(201, 162, 39, 0.12)',
+  goldMuted: 'rgba(217, 119, 6, 0.16)',
   tint: palette.gold[600],
   tabBar: '#ffffff',
   tabBarBorder: 'rgba(15, 23, 42, 0.08)',
