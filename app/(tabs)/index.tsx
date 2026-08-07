@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -106,6 +107,8 @@ export default function CounterScreen() {
   const [ripple, setRipple] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [toastAchievement, setToastAchievement] = useState<Achievement | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualCount, setManualCount] = useState('');
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const count = sessionCount.count;
@@ -355,6 +358,42 @@ export default function CounterScreen() {
     setShowPrayerSelector(false);
   };
 
+  const handleManualSubmit = async () => {
+    const value = parseInt(manualCount, 10);
+    if (isNaN(value) || value <= 0) return;
+
+    if (multiMode) {
+      const next = [...multiCounts];
+      next[activeCounterIndex] += value;
+      setMultiCounts(next);
+    } else {
+      setSessionCount({ count: count + value, targetId: activeTargetId });
+    }
+
+    await addLog({
+      count: value,
+      timestamp: new Date().toISOString(),
+      dateStr,
+      targetId: activeTargetId ?? undefined,
+    });
+
+    if (activeTargetId) {
+      const t = getTarget(activeTargetId);
+      if (t) {
+        const nextCurrent = t.currentCount + value;
+        const patch: Partial<typeof t> = { currentCount: nextCurrent };
+        if (nextCurrent >= t.targetCount) {
+          patch.status = 'completed';
+          await cancelGoalReminders(t);
+        }
+        await updateTarget(activeTargetId, patch);
+      }
+    }
+
+    setManualCount('');
+    setShowManualEntry(false);
+  };
+
   const activePrayerName = prayerMode
     ? PRAYERS.find((p) => p.id === prayerMode)?.name ?? ''
     : '';
@@ -569,6 +608,11 @@ export default function CounterScreen() {
               <View style={[styles.button, { backgroundColor: colors.backgroundSecondary }, ripple && styles.buttonPressed]}>
                 <Pressable
                   onPress={handleTap}
+                  onLongPress={() => {
+                    setManualCount('');
+                    setShowManualEntry(true);
+                  }}
+                  delayLongPress={800}
                   style={({ pressed }) => [
                     styles.buttonInner,
                     { transform: [{ scale: pressed || ripple ? 0.98 : 1 }] },
@@ -829,6 +873,49 @@ export default function CounterScreen() {
             })}
           </View>
         </Pressable>
+      </Modal>
+
+      {/* Manual entry modal */}
+      <Modal visible={showManualEntry} transparent animationType="fade">
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <Card style={{ marginHorizontal: 32, alignItems: 'center' }}>
+            <Title style={{ fontSize: 20, textAlign: 'center' }}>
+              Add Count Manually
+            </Title>
+            <Subtitle style={{ textAlign: 'center' }}>
+              Enter the amount to add to{' '}
+              <Text style={{ color: colors.gold, fontWeight: '700' }}>
+                {multiMode ? MULTI_PRESET[activeCounterIndex].name : activeTarget?.title ?? 'today'}
+              </Text>
+            </Subtitle>
+            <TextInput
+              value={manualCount}
+              onChangeText={setManualCount}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+              style={[
+                styles.manualInput,
+                { backgroundColor: colors.inputBg },
+              ]}
+            />
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              <Pressable
+                onPress={() => setShowManualEntry(false)}
+                style={[styles.modalBtn, { flex: 1, backgroundColor: colors.inputBg }]}
+              >
+                <Text style={{ color: colors.gold, fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleManualSubmit}
+                style={[styles.modalBtn, { flex: 1, backgroundColor: colors.gold }]}
+              >
+                <Text style={{ color: '#020617', fontWeight: '700' }}>Add</Text>
+              </Pressable>
+            </View>
+          </Card>
+        </View>
       </Modal>
 
       {/* Completion modal */}
@@ -1169,5 +1256,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  manualInput: {
+    marginTop: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    fontFamily: FONTS.serif,
+    textAlign: 'center',
+    color: '#fff',
   },
 });
