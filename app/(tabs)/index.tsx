@@ -607,6 +607,23 @@ export default function CounterScreen() {
                     cy={RING_VIEWBOX / 2}
                     r={RING_RADIUS}
                     stroke={WEB_GOLD_500}
+                    strokeWidth={6}
+                    strokeOpacity={0.15}
+                    fill="none"
+                    strokeLinecap="round"
+                    rotation={-90}
+                    originX={RING_VIEWBOX / 2}
+                    originY={RING_VIEWBOX / 2}
+                    strokeDasharray={RING_CIRCUMFERENCE}
+                    strokeDashoffset={
+                      RING_CIRCUMFERENCE * (1 - Math.min(100, progress) / 100)
+                    }
+                  />
+                  <SvgCircle
+                    cx={RING_VIEWBOX / 2}
+                    cy={RING_VIEWBOX / 2}
+                    r={RING_RADIUS}
+                    stroke={WEB_GOLD_500}
                     strokeWidth={RING_STROKE}
                     fill="none"
                     strokeLinecap="round"
@@ -1044,9 +1061,9 @@ const serifStyle = { fontFamily: FONTS.serif } as const;
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 32,
     paddingBottom: 120,
-    paddingTop: 8,
+    paddingTop: 48,
   },
   topBar: {
     flexDirection: 'row',
