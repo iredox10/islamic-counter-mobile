@@ -23,13 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react-native';
-import Svg, {
-  Circle as SvgCircle,
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from 'react-native-svg';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -640,33 +634,6 @@ export default function CounterScreen() {
 
               {/* the button */}
               <View style={[styles.button, ripple && styles.buttonPressed]}>
-                <Svg
-                  style={StyleSheet.absoluteFill}
-                  width={BUTTON_SIZE}
-                  height={BUTTON_SIZE}
-                  viewBox="0 0 100 100"
-                >
-                  <Defs>
-                    <SvgLinearGradient
-                      id="btnGrad"
-                      x1="0%"
-                      y1="0%"
-                      x2="100%"
-                      y2="100%"
-                    >
-                      <Stop offset="0" stopColor={WEB_SLATE_800} />
-                      <Stop offset="1" stopColor={WEB_SLATE_950} />
-                    </SvgLinearGradient>
-                  </Defs>
-                  <Rect
-                    x="0"
-                    y="0"
-                    width="100"
-                    height="100"
-                    rx="50"
-                    fill="url(#btnGrad)"
-                  />
-                </Svg>
                 <Pressable
                   onPress={handleTap}
                   onLongPress={() => {
@@ -1129,6 +1096,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: WEB_SLATE_800,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
     shadowColor: '#050812',
