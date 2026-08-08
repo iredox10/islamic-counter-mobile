@@ -19,6 +19,7 @@ export interface Target {
   reminderTime?: string;
   reminderDays?: number[];
   notificationIds?: string[];
+  lateReminderId?: string;
   lastNotified?: string;
   createdAt: string;
   status: 'active' | 'completed' | 'archived';

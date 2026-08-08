@@ -69,10 +69,22 @@ export async function cancelGoalReminders(target: Target): Promise<void> {
     for (const id of ids) {
       await n.cancelScheduledNotificationAsync(id).catch(() => {});
     }
+    if (target.lateReminderId) {
+      await n.cancelScheduledNotificationAsync(target.lateReminderId).catch(() => {});
+    }
   }
-  if (ids.length > 0) {
-    await updateTarget(target.id, { notificationIds: [] });
+  if (ids.length > 0 || target.lateReminderId) {
+    await updateTarget(target.id, { notificationIds: [], lateReminderId: undefined });
   }
+}
+
+export async function cancelLateReminder(target: Target): Promise<void> {
+  if (!target.lateReminderId) return;
+  const n = await loadNotifications();
+  if (n) {
+    await n.cancelScheduledNotificationAsync(target.lateReminderId).catch(() => {});
+  }
+  await updateTarget(target.id, { lateReminderId: undefined });
 }
 
 function hasReminderConfig(target: Target): boolean {
@@ -144,6 +156,25 @@ export async function scheduleGoalReminders(target: Target): Promise<void> {
         },
       });
       ids.push(id);
+    }
+  }
+
+  if (target.reminderType === 'one-off' && target.reminderGap && target.startTime) {
+    const start = new Date(target.startTime);
+    const fireAt = new Date(start.getTime() + target.reminderGap * 60 * 1000);
+    const triggerDate = fireAt.getTime() > Date.now() ? fireAt : new Date(Date.now() + 10 * 1000);
+    if (fireAt.getTime() > Date.now() || target.currentCount === 0) {
+      const id = await n.scheduleNotificationAsync({
+        content: {
+          title: '🕌 Dhikr Goal',
+          body: `You haven't started your goal of ${target.targetCount} yet!`,
+        },
+        trigger: {
+          type: n.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+        },
+      });
+      await updateTarget(target.id, { lateReminderId: id });
     }
   }
 

@@ -54,7 +54,7 @@ import {
 import { checkAchievements, type Achievement } from '@/lib/achievements';
 import { getTarget } from '@/lib/db';
 import { playTapSound, playCompletionSound } from '@/lib/sounds';
-import { cancelGoalReminders, scheduleGoalReminders } from '@/lib/goalReminders';
+import { cancelGoalReminders, cancelLateReminder, scheduleGoalReminders } from '@/lib/goalReminders';
 import { useAchievementTracker } from '@/lib/useAchievementTracker';
 import { shareProgress } from '@/lib/share';
 import { AchievementToast } from '@/components/AchievementToast';
@@ -325,6 +325,8 @@ export default function CounterScreen() {
         if (nextCurrent >= t.targetCount) {
           patch.status = 'completed';
           await cancelGoalReminders(t);
+        } else if (t.currentCount === 0 && t.lateReminderId) {
+          await cancelLateReminder(t);
         }
         await updateTarget(activeTargetId, patch);
       }
@@ -396,6 +398,8 @@ export default function CounterScreen() {
         if (nextCurrent >= t.targetCount) {
           patch.status = 'completed';
           await cancelGoalReminders(t);
+        } else if (t.currentCount === 0 && t.lateReminderId) {
+          await cancelLateReminder(t);
         }
         await updateTarget(activeTargetId, patch);
       }
