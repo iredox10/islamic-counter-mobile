@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import safeStorage from './storage';
 
 export type NotificationSound = 'default' | 'gentle' | 'bell' | 'chime' | 'custom' | 'none';
@@ -5,68 +7,45 @@ export type NotificationSound = 'default' | 'gentle' | 'bell' | 'chime' | 'custo
 const SOUND_STORAGE_KEY = 'tasbih-notification-sound';
 const CUSTOM_SOUND_KEY = 'tasbih-custom-sound';
 
-let audioCtx: any = null;
+const SOUND_ASSETS: Record<string, number> = {
+  default: require('../assets/sounds/default.wav'),
+  gentle: require('../assets/sounds/gentle.wav'),
+  bell: require('../assets/sounds/bell.wav'),
+  chime: require('../assets/sounds/chime.wav'),
+  tap: require('../assets/sounds/tap.wav'),
+};
 
-function getAudioContext() {
-  if (typeof window === 'undefined') return null;
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
-    }
-  }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
-  return audioCtx;
-}
+let players: Record<string, AudioPlayer> = {};
+let audioModeSet = false;
 
-export async function getSelectedSound(): Promise<NotificationSound> {
+async function ensureAudioMode() {
+  if (audioModeSet || Platform.OS === 'web') return;
   try {
-    const stored = await safeStorage.getItem(SOUND_STORAGE_KEY);
-    if (stored) return stored as NotificationSound;
+    await setAudioModeAsync({ playsInSilentMode: true });
+    audioModeSet = true;
   } catch {}
-  return 'default';
 }
 
-export async function setSelectedSound(sound: NotificationSound): Promise<void> {
-  await safeStorage.setItem(SOUND_STORAGE_KEY, sound);
+function getPlayer(id: string): AudioPlayer | null {
+  if (Platform.OS === 'web') return null;
+  const asset = SOUND_ASSETS[id];
+  if (!asset) return null;
+  if (!players[id]) {
+    players[id] = createAudioPlayer(asset);
+  }
+  return players[id];
 }
 
-export async function saveCustomSoundUri(uri: string): Promise<void> {
-  await safeStorage.setItem(CUSTOM_SOUND_KEY, uri);
-}
-
-export async function getCustomSoundUri(): Promise<string | null> {
-  return safeStorage.getItem(CUSTOM_SOUND_KEY);
-}
-
-export function playTapSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
+function playPlayer(id: string) {
+  const player = getPlayer(id);
+  if (!player) return;
   try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.04);
-
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.04);
+    player.seekTo(0);
+    player.play();
   } catch (e) {}
 }
 
-export async function playCompletionSound(sound: NotificationSound = 'bell') {
-  if (sound === 'none') return;
-
+async function playWebCompletion(sound: NotificationSound) {
   if (sound === 'custom') {
     const customUri = await getCustomSoundUri();
     if (customUri && typeof window !== 'undefined') {
@@ -108,6 +87,95 @@ export async function playCompletionSound(sound: NotificationSound = 'bell') {
       osc.stop(ctx.currentTime + index * 0.1 + 0.35);
     });
   } catch (e) {}
+}
+
+let audioCtx: any = null;
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null;
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
+}
+
+export async function getSelectedSound(): Promise<NotificationSound> {
+  try {
+    const stored = await safeStorage.getItem(SOUND_STORAGE_KEY);
+    if (stored) return stored as NotificationSound;
+  } catch {}
+  return 'default';
+}
+
+export async function setSelectedSound(sound: NotificationSound): Promise<void> {
+  await safeStorage.setItem(SOUND_STORAGE_KEY, sound);
+}
+
+export async function saveCustomSoundUri(uri: string): Promise<void> {
+  await safeStorage.setItem(CUSTOM_SOUND_KEY, uri);
+}
+
+export async function getCustomSoundUri(): Promise<string | null> {
+  return safeStorage.getItem(CUSTOM_SOUND_KEY);
+}
+
+export function playTapSound() {
+  if (Platform.OS === 'web') {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.04);
+
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.04);
+    } catch (e) {}
+    return;
+  }
+  playPlayer('tap');
+}
+
+export async function playCompletionSound(sound: NotificationSound = 'bell') {
+  if (sound === 'none') return;
+
+  await ensureAudioMode();
+
+  if (Platform.OS === 'web') {
+    await playWebCompletion(sound);
+    return;
+  }
+
+  if (sound === 'custom') {
+    const customUri = await getCustomSoundUri();
+    if (customUri && typeof window !== 'undefined') {
+      try {
+        const audio = new Audio(customUri);
+        audio.play().catch(() => {});
+        return;
+      } catch (e) {}
+    }
+  }
+
+  if (SOUND_ASSETS[sound]) {
+    playPlayer(sound);
+  }
 }
 
 export const SOUND_OPTIONS: { id: NotificationSound; name: string; description: string }[] = [
