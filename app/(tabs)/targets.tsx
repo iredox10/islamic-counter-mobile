@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -37,7 +37,8 @@ import { addTarget, deleteTarget } from '@/lib/db';
 import { ACHIEVEMENTS, type Achievement } from '@/lib/achievements';
 import { ADHKAR_PRESETS } from '@/lib/adhkar';
 import { KEYS } from '@/hooks/useSettings';
-import { shareProgress } from '@/lib/share';
+import { shareProgress, shareProgressImage, type ShareCardData } from '@/lib/share';
+import { ShareCard } from '@/components/ShareCard';
 import type { Target } from '@/lib/types';
 import {
   scheduleGoalReminders,
@@ -81,6 +82,8 @@ export default function TargetsScreen() {
     mode: 'date' | 'time';
   } | null>(null);
   const [tempDate, setTempDate] = useState<Date | null>(null);
+  const [shareData, setShareData] = useState<ShareCardData | null>(null);
+  const shareCardRef = useRef<View>(null);
 
   const active = targets.filter((t) => t.status === 'active');
   const completed = targets.filter((t) => t.status === 'completed');
@@ -190,13 +193,25 @@ export default function TargetsScreen() {
     ]);
   };
 
-  const handleShare = (t: Target) => {
-    shareProgress({
+  const handleShare = async (t: Target) => {
+    const data: ShareCardData = {
       title: t.title,
       count: t.currentCount,
       targetCount: t.targetCount,
       completedAt: new Date(),
-    });
+    };
+    setShareData(data);
+    try {
+      await new Promise((r) => setTimeout(r, 100));
+      const sharedImage = await shareProgressImage(data, shareCardRef);
+      if (!sharedImage) {
+        await shareProgress(data);
+      }
+      setShareData(null);
+    } catch {
+      setShareData(null);
+      await shareProgress(data);
+    }
   };
 
   return (
@@ -471,6 +486,16 @@ export default function TargetsScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {shareData ? (
+        <View
+          pointerEvents="none"
+          collapsable={false}
+          style={styles.hiddenShareCard}
+        >
+          <ShareCard ref={shareCardRef} data={shareData} />
+        </View>
+      ) : null}
 
       <Modal visible={showForm} transparent animationType="slide">
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
@@ -1031,5 +1056,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  hiddenShareCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: -1,
+    transform: [{ translateX: -10000 }],
   },
 });

@@ -1,6 +1,9 @@
 import { Share, Alert, Platform } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
 import { format } from 'date-fns';
 import { gregorianToHijri } from './hijri';
+import type { RefObject, Component } from 'react';
+import type { View } from 'react-native';
 
 export interface ShareCardData {
   title: string;
@@ -84,5 +87,48 @@ export async function shareProgress(data: ShareCardData): Promise<void> {
     });
   } catch (error: any) {
     Alert.alert('Share Failed', error.message || 'Could not open share menu');
+  }
+}
+
+export async function shareProgressImage(
+  data: ShareCardData,
+  cardRef: RefObject<Component<object, {}, any> | View | null>
+): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+
+  let uri: string | null = null;
+  try {
+    uri = await captureRef(cardRef, {
+      format: 'png',
+      quality: 1,
+    });
+  } catch {
+    return false;
+  }
+
+  try {
+    const exporter = await import('expo-sharing');
+    const isAvailable = await exporter.isAvailableAsync();
+    if (isAvailable) {
+      await exporter.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'My Dhikr Milestone',
+        UTI: 'public.png',
+      });
+      return true;
+    }
+  } catch {
+    /* fall through to RN share */
+  }
+
+  try {
+    await Share.share({
+      message: generateShareText(data),
+      url: uri,
+      title: 'My Dhikr Milestone',
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
