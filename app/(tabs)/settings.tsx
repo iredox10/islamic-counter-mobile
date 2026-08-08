@@ -8,7 +8,9 @@ import {
   Switch,
   Alert,
   Share,
+  Platform,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Sun,
@@ -21,6 +23,8 @@ import {
   Volume2,
   Bell,
   ShieldCheck,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -35,6 +39,13 @@ import {
 } from '@/lib/reminders';
 import { clearAllData, exportAllData, importAndMergeData } from '@/lib/db';
 import { requestNotificationPermissions, scheduleLocalReminder } from '@/lib/pushNotifications';
+import {
+  getSelectedSound,
+  setSelectedSound,
+  playCompletionSound,
+  SOUND_OPTIONS,
+  type NotificationSound,
+} from '@/lib/sounds';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -42,9 +53,12 @@ export default function SettingsScreen() {
   const [soundEnabled, setSoundEnabled] = useBooleanSetting(KEYS.sound, false);
   const [autoReset, setAutoReset] = useBooleanSetting(KEYS.autoReset, false);
   const [reminders, setReminders] = useState<DailyReminder[]>([]);
+  const [selectedSound, setSelectedSoundState] = useState<NotificationSound>('default');
+  const [timePickerFor, setTimePickerFor] = useState<string | null>(null);
 
   useEffect(() => {
     getStoredReminders().then(setReminders);
+    getSelectedSound().then(setSelectedSoundState);
   }, []);
 
   const themeOptions: { value: ThemePreference; label: string; icon: React.ReactNode }[] = [
@@ -67,6 +81,32 @@ export default function SettingsScreen() {
     const updatedReminder = updated.find((r) => r.id === id);
     if (updatedReminder) {
       await scheduleLocalReminder(updatedReminder);
+    }
+  };
+
+  const handleTimeChange = async (event: DateTimePickerEvent, selected?: Date) => {
+    if (event.type === 'dismissed' || !selected || !timePickerFor) {
+      setTimePickerFor(null);
+      return;
+    }
+    const time = `${String(selected.getHours()).padStart(2, '0')}:${String(
+      selected.getMinutes()
+    ).padStart(2, '0')}`;
+    const updated = updateReminder(reminders, timePickerFor, { time });
+    setReminders(updated);
+    saveReminders(updated);
+    const reminder = updated.find((r) => r.id === timePickerFor);
+    if (reminder?.enabled) {
+      await scheduleLocalReminder(reminder);
+    }
+    setTimePickerFor(null);
+  };
+
+  const handleSoundSelect = async (sound: NotificationSound) => {
+    setSelectedSoundState(sound);
+    await setSelectedSound(sound);
+    if (sound !== 'none') {
+      playCompletionSound(sound);
     }
   };
 
@@ -207,21 +247,69 @@ export default function SettingsScreen() {
               Configure daily Adhkar reminders for Salah times and morning/evening sessions.
             </Text>
             {reminders.map((r) => (
-              <Row
-                key={r.id}
-                icon={<Bell size={18} color={r.enabled ? colors.gold : colors.textMuted} />}
-                label={`${r.name} · ${r.time}`}
-                colors={colors}
-                right={
-                  <Switch
-                    value={r.enabled}
-                    onValueChange={() => toggleReminder(r.id)}
-                    trackColor={{ true: colors.gold, false: colors.inputBg }}
-                    thumbColor="#fff"
-                  />
-                }
-              />
+              <View key={r.id} style={styles.reminderRow}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => setTimePickerFor(r.id)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Bell size={18} color={r.enabled ? colors.gold : colors.textMuted} />
+                    <Text style={{ color: colors.text, fontSize: 15, marginLeft: 10, flex: 1 }}>
+                      {r.name}
+                    </Text>
+                    <View style={[styles.timeChip, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
+                      <Clock size={12} color={colors.gold} />
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                        {r.time}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, marginLeft: 28, marginTop: 2 }}>
+                    {r.message}
+                  </Text>
+                </Pressable>
+                <Switch
+                  value={r.enabled}
+                  onValueChange={() => toggleReminder(r.id)}
+                  trackColor={{ true: colors.gold, false: colors.inputBg }}
+                  thumbColor="#fff"
+                />
+              </View>
             ))}
+          </Section>
+
+          {/* Notification Sound */}
+          <Section title="Notification Sound" colors={colors}>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+              Played when a counter reaches its goal or a reminder fires.
+            </Text>
+            {SOUND_OPTIONS.map((sound) => {
+              const active = selectedSound === sound.id;
+              return (
+                <Pressable
+                  key={sound.id}
+                  onPress={() => handleSoundSelect(sound.id)}
+                  style={[
+                    styles.soundRow,
+                    {
+                      backgroundColor: active ? colors.goldMuted : colors.inputBg,
+                      borderColor: active ? colors.gold : colors.cardBorder,
+                    },
+                  ]}
+                >
+                  <Volume2 size={18} color={active ? colors.gold : colors.textMuted} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ color: active ? colors.gold : colors.text, fontSize: 14, fontWeight: '600' }}>
+                      {sound.name}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+                      {sound.description}
+                    </Text>
+                  </View>
+                  {active ? <CheckCircle2 size={18} color={colors.gold} /> : null}
+                </Pressable>
+              );
+            })}
           </Section>
 
           {/* Data */}
@@ -269,6 +357,22 @@ export default function SettingsScreen() {
             React Native · Expo
           </Text>
         </ScrollView>
+
+        {timePickerFor && Platform.OS !== 'web' ? (
+          <DateTimePicker
+            value={(() => {
+              const [h, m] = (reminders.find((r) => r.id === timePickerFor)?.time ?? '06:00')
+                .split(':')
+                .map(Number);
+              const d = new Date();
+              d.setHours(h, m, 0, 0);
+              return d;
+            })()}
+            mode="time"
+            display="default"
+            onChange={handleTimeChange}
+          />
+        ) : null}
       </SafeAreaView>
     </Screen>
   );
@@ -346,5 +450,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 4,
+  },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  timeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  soundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
 });

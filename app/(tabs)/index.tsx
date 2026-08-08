@@ -53,7 +53,7 @@ import {
 } from '@/lib/adhkar';
 import { checkAchievements, type Achievement } from '@/lib/achievements';
 import { getTarget } from '@/lib/db';
-import { playTapSound, playCompletionSound } from '@/lib/sounds';
+import { playTapSound, playCompletionSound, getSelectedSound } from '@/lib/sounds';
 import { cancelGoalReminders, cancelLateReminder, scheduleGoalReminders } from '@/lib/goalReminders';
 import { useAchievementTracker } from '@/lib/useAchievementTracker';
 import { shareProgress } from '@/lib/share';
@@ -242,7 +242,7 @@ export default function CounterScreen() {
   const hapticForCount = async (n: number) => {
     if (soundEnabled) {
       if (n === 33 || n === 100 || n === 1000) {
-        playCompletionSound('bell');
+        playCompletionSound(await getSelectedSound());
       } else {
         playTapSound();
       }

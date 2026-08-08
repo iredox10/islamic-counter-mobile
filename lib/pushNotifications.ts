@@ -1,6 +1,6 @@
 import { Alert, Platform } from 'react-native';
 import { getStoredReminders, saveReminders, type DailyReminder } from './reminders';
-import { playCompletionSound } from './sounds';
+import { playCompletionSound, getSelectedSound } from './sounds';
 
 export interface NotificationStatus {
   granted: boolean;
@@ -38,7 +38,7 @@ export async function scheduleLocalReminder(reminder: DailyReminder): Promise<vo
         new window.Notification(`🕌 ${reminder.name}`, {
           body: reminder.message,
         });
-        playCompletionSound('bell');
+        getSelectedSound().then((s) => playCompletionSound(s));
       }, Math.min(delayMs, 2147483647));
     }
   }
