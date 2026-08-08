@@ -61,7 +61,7 @@ const WEB_GOLD_400 = '#fbbf24'; // web gold-400 (count number)
 const WEB_GOLD_500 = '#f59e0b'; // web gold-500 (progress ring)
 const WEB_SLATE_800 = '#1e293b'; // web midnight-800 (button top gradient)
 const WEB_SLATE_950 = '#020617'; // web midnight-950 (button bottom gradient)
-const WEB_SLATE_400 = '#94a3b8'; // web slate-400 (/ target)
+const WEB_SLATE_400 = '#94a3b8'; // web slate-400 (/ target, subtitle)
 const WEB_WHITE_5 = 'rgba(255,255,255,0.05)'; // web border-white/5
 
 const categoryIcons: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -405,17 +405,10 @@ export default function CollectionsScreen() {
           <ScrollView contentContainerStyle={styles.scroll}>
             <View style={styles.activeHeader}>
               <Pressable onPress={leaveCollection} style={styles.backBtn}>
-                <ChevronLeft size={24} color={colors.text} />
-              </Pressable>
-              <View style={{ flex: 1 }}>
-                <Title style={{ fontSize: 22 }}>{selected.title}</Title>
-                <Subtitle>{selected.description}</Subtitle>
-              </View>
-              <Pressable
-                onPress={() => setShowTranslation((v) => !v)}
-                style={[styles.iconBtn, { backgroundColor: showTranslation ? colors.goldMuted : colors.inputBg }]}
-              >
-                <Languages size={18} color={showTranslation ? colors.gold : colors.textMuted} />
+                <ChevronLeft size={20} color={WEB_SLATE_400} />
+                <Text style={{ fontFamily: FONTS.sansBold, fontSize: 14, color: WEB_SLATE_400 }}>
+                  Back
+                </Text>
               </Pressable>
             </View>
 
@@ -428,6 +421,32 @@ export default function CollectionsScreen() {
                 View History
               </Text>
             </Pressable>
+
+            <View style={styles.titleRow}>
+              <View
+                style={[
+                  styles.catChip,
+                  { backgroundColor: `${categoryColors[selected.category] ?? colors.gold}1A` },
+                ]}
+              >
+                {(() => {
+                  const Icon = categoryIcons[selected.category] ?? Sparkles;
+                  return (
+                    <Icon size={24} color={categoryColors[selected.category] ?? colors.gold} />
+                  );
+                })()}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Title style={{ fontSize: 24 }}>{selected.title}</Title>
+                <Subtitle style={{ color: WEB_SLATE_400, fontSize: 14 }}>{selected.description}</Subtitle>
+              </View>
+              <Pressable
+                onPress={() => setShowTranslation((v) => !v)}
+                style={[styles.iconBtn, { backgroundColor: showTranslation ? colors.goldMuted : colors.inputBg }]}
+              >
+                <Languages size={18} color={showTranslation ? colors.gold : colors.textMuted} />
+              </Pressable>
+            </View>
 
             {streak && streak.currentStreak > 0 ? (
               <View
@@ -545,8 +564,10 @@ export default function CollectionsScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.listHeader}>
             <View>
-              <Title>Adhkar</Title>
-              <Subtitle>Morning, evening & more</Subtitle>
+              <Title style={{ fontSize: 30 }}>Adhkar</Title>
+              <Subtitle style={{ color: WEB_SLATE_400 }}>
+                Morning, Evening & Daily Supplications
+              </Subtitle>
             </View>
             <Pressable
               onPress={() => router.push('/history')}
@@ -614,7 +635,7 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 20,
     paddingBottom: 120,
-    paddingTop: 8,
+    paddingTop: 32,
   },
   listHeader: {
     flexDirection: 'row',
@@ -660,7 +681,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
     padding: 4,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  catChip: {
+    padding: 12,
+    borderRadius: 12,
   },
   iconBtn: {
     height: 40,
