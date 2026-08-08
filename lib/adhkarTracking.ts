@@ -1,9 +1,10 @@
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import {
   addAdhkarSession,
   addJournalEntry,
   upsertAdhkarStreak,
   getAdhkarStreak,
+  getAllAdhkarStreaks,
   getAdhkarSessions,
   getAdhkarJournal,
 } from './db';
@@ -111,6 +112,83 @@ export async function getStreak(
   collectionId: string
 ): Promise<AdhkarStreak | undefined> {
   return getAdhkarStreak(collectionId);
+}
+
+export function getAllStreaks(): AdhkarStreak[] {
+  return [...getAllAdhkarStreaks()].sort(
+    (a, b) => b.currentStreak - a.currentStreak
+  );
+}
+
+export interface WeeklySummary {
+  days: Array<{
+    dateStr: string;
+    totalCounts: number;
+    totalDuration: number;
+    sessionsCount: number;
+  }>;
+  totalCounts: number;
+  totalDuration: number;
+  totalSessions: number;
+}
+
+export function getWeeklySummary(): WeeklySummary {
+  const days: WeeklySummary['days'] = [];
+  const sessions = getAdhkarSessions();
+
+  for (let i = 6; i >= 0; i--) {
+    const dateStr = format(subDays(new Date(), i), 'yyyy-MM-dd');
+    const daySessions = sessions.filter((s) => s.dateStr === dateStr);
+    days.push({
+      dateStr,
+      totalCounts: daySessions.reduce((sum, s) => sum + s.totalCounts, 0),
+      totalDuration: daySessions.reduce(
+        (sum, s) => sum + s.durationSeconds,
+        0
+      ),
+      sessionsCount: daySessions.length,
+    });
+  }
+
+  return {
+    days,
+    totalCounts: days.reduce((sum, d) => sum + d.totalCounts, 0),
+    totalDuration: days.reduce((sum, d) => sum + d.totalDuration, 0),
+    totalSessions: days.reduce((sum, d) => sum + d.sessionsCount, 0),
+  };
+}
+
+export function getDailyStats(dateStr: string): {
+  counts: number;
+  duration: number;
+  sessions: number;
+} {
+  const daySessions = getAdhkarSessions().filter((s) => s.dateStr === dateStr);
+  return {
+    counts: daySessions.reduce((sum, s) => sum + s.totalCounts, 0),
+    duration: daySessions.reduce((sum, s) => sum + s.durationSeconds, 0),
+    sessions: daySessions.length,
+  };
+}
+
+export function exportHistoryJSON(): string {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    sessions: getAdhkarSessions(),
+    journal: getAdhkarJournal(),
+    streaks: getAllAdhkarStreaks(),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+export function exportHistoryCSV(): string {
+  const rows: string[] = ['Date,Collection,Dhikr,Count,Target,Completed At'];
+  for (const entry of getAdhkarJournal()) {
+    rows.push(
+      `${entry.dateStr},"${entry.collectionName}","${entry.dhikrName}",${entry.count},${entry.target},${entry.completedAt}`
+    );
+  }
+  return rows.join('\n');
 }
 
 export function getSessionHistory(limit = 30): AdhkarSession[] {

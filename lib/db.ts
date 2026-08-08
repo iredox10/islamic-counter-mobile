@@ -295,6 +295,10 @@ export function getAdhkarStreak(collectionId: string): AdhkarStreak | undefined 
   return state.adhkarStreaks.find((s) => s.collectionId === collectionId);
 }
 
+export function getAllAdhkarStreaks(): AdhkarStreak[] {
+  return state.adhkarStreaks;
+}
+
 export async function addJournalEntry(
   entry: Omit<AdhkarJournal, 'id'>
 ): Promise<void> {

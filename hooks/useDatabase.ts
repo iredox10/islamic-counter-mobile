@@ -12,6 +12,7 @@ import {
   getPrayerCompletionsByDate,
   getAdhkarSessions,
   getAdhkarJournal,
+  getAllAdhkarStreaks,
 } from '@/lib/db';
 import type { DatabaseState } from '@/lib/types';
 
@@ -141,5 +142,13 @@ export function useAdhkarJournal() {
     subscribe,
     () => getMemoizedSnapshot('adhkarJournal', getAdhkarJournal),
     () => getMemoizedSnapshot('adhkarJournal', getAdhkarJournal)
+  );
+}
+
+export function useAdhkarStreaks() {
+  return useSyncExternalStore(
+    subscribe,
+    () => getMemoizedSnapshot('adhkarStreaks', getAllAdhkarStreaks),
+    () => getMemoizedSnapshot('adhkarStreaks', getAllAdhkarStreaks)
   );
 }
