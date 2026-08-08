@@ -26,7 +26,12 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react-native';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import Svg, {
+  Circle as SvgCircle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+} from 'react-native-svg';
 import { format } from 'date-fns';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -46,11 +51,18 @@ import {
   getCurrentSession,
 } from '@/lib/adhkarTracking';
 import type { AdhkarStreak } from '@/lib/types';
+import { FONTS } from '@/lib/fonts';
 
-const RING_RADIUS = 96;
-const RING_STROKE = 10;
-const RING_SVG_SIZE = 208;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const AZKAR_BUTTON = 288; // web: w-72 h-72 rounded-full button
+const AZKAR_RADIUS = 47; // web: viewBox 0 0 100 100, ring r=47
+const AZKAR_STROKE = 4; // web: strokeWidth 4
+const AZKAR_CIRCUMFERENCE = 2 * Math.PI * AZKAR_RADIUS; // 295.31
+const WEB_GOLD_400 = '#fbbf24'; // web gold-400 (count number)
+const WEB_GOLD_500 = '#f59e0b'; // web gold-500 (progress ring)
+const WEB_SLATE_800 = '#1e293b'; // web midnight-800 (button top gradient)
+const WEB_SLATE_950 = '#020617'; // web midnight-950 (button bottom gradient)
+const WEB_SLATE_400 = '#94a3b8'; // web slate-400 (/ target)
+const WEB_WHITE_5 = 'rgba(255,255,255,0.05)'; // web border-white/5
 
 const categoryIcons: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   morning: Sun,
@@ -256,49 +268,66 @@ export default function CollectionsScreen() {
               </View>
             ) : null}
 
-            <View style={styles.ringArea}>
-              <View pointerEvents="none" style={styles.ringSvgWrap}>
-                <Svg width={RING_SVG_SIZE} height={RING_SVG_SIZE}>
+            <Pressable
+              onPress={handleIncrement}
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <View style={styles.ringArea}>
+                <Svg
+                  pointerEvents="none"
+                  style={StyleSheet.absoluteFill}
+                  width={AZKAR_BUTTON}
+                  height={AZKAR_BUTTON}
+                  viewBox={`0 0 100 100`}
+                >
+                  <Defs>
+                    <SvgLinearGradient
+                      id="azkarBtnGrad"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <Stop offset="0" stopColor={WEB_SLATE_800} />
+                      <Stop offset="1" stopColor={WEB_SLATE_950} />
+                    </SvgLinearGradient>
+                  </Defs>
+                  <SvgCircle cx={50} cy={50} r={50} fill="url(#azkarBtnGrad)" />
                   <SvgCircle
-                    cx={RING_SVG_SIZE / 2}
-                    cy={RING_SVG_SIZE / 2}
-                    r={RING_RADIUS}
-                    stroke={colors.cardBorder}
-                    strokeWidth={RING_STROKE}
+                    cx={50}
+                    cy={50}
+                    r={AZKAR_RADIUS}
+                    stroke="rgba(30,41,59,0.5)"
+                    strokeWidth={AZKAR_STROKE}
                     fill="none"
                   />
                   <SvgCircle
-                    cx={RING_SVG_SIZE / 2}
-                    cy={RING_SVG_SIZE / 2}
-                    r={RING_RADIUS}
-                    stroke={colors.gold}
-                    strokeWidth={RING_STROKE}
+                    cx={50}
+                    cy={50}
+                    r={AZKAR_RADIUS}
+                    stroke={WEB_GOLD_500}
+                    strokeWidth={AZKAR_STROKE}
                     fill="none"
                     strokeLinecap="round"
                     rotation={-90}
-                    originX={RING_SVG_SIZE / 2}
-                    originY={RING_SVG_SIZE / 2}
-                    strokeDasharray={RING_CIRCUMFERENCE}
-                    strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct / 100)}
+                    originX={50}
+                    originY={50}
+                    strokeDasharray={AZKAR_CIRCUMFERENCE}
+                    strokeDashoffset={AZKAR_CIRCUMFERENCE * (1 - pct / 100)}
                   />
                 </Svg>
-              </View>
-              <Pressable
-                onPress={handleIncrement}
-                style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
-              >
-                <View
-                  style={[
-                    styles.countOuter,
-                    { borderColor: colors.gold, backgroundColor: colors.card },
-                  ]}
-                >
-                  <Text style={[styles.countNum, { color: colors.gold }]}>{itemCount}</Text>
-                  <Text style={{ color: colors.textMuted }}>/ {item.target}</Text>
+                <View style={styles.countOuter}>
+                  <Text style={[styles.countNum, { color: WEB_GOLD_400 }]}>
+                    {itemCount}
+                  </Text>
+                  <Text style={{ color: WEB_SLATE_400, fontSize: 16, marginTop: 8 }}>
+                    / {item.target}
+                  </Text>
                 </View>
-              </Pressable>
-            </View>
-            <Text style={{ color: colors.textMuted, marginTop: 12 }}>Tap to count</Text>
+              </View>
+            </Pressable>
 
             <Pressable
               onPress={() => setShowAdhkarList(!canShowList)}
@@ -733,28 +762,34 @@ const styles = StyleSheet.create({
   ringArea: {
     position: 'relative',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 36,
-    width: 180,
-    height: 180,
-  },
-  ringSvgWrap: {
-    position: 'absolute',
-    width: RING_SVG_SIZE,
-    height: RING_SVG_SIZE,
-    left: (180 - RING_SVG_SIZE) / 2,
-    top: (180 - RING_SVG_SIZE) / 2,
+    width: AZKAR_BUTTON,
+    height: AZKAR_BUTTON,
+    borderRadius: AZKAR_BUTTON / 2,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: WEB_WHITE_5,
+    shadowColor: '#050812',
+    shadowOffset: { width: 20, height: 20 },
+    shadowOpacity: 0.8,
+    shadowRadius: 60,
+    elevation: 10,
+    backgroundColor: WEB_SLATE_800,
   },
   countOuter: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   countNum: {
-    fontSize: 52,
+    fontSize: 96,
+    letterSpacing: -4,
     fontWeight: '700',
+    fontFamily: FONTS.serif,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
   },
   listToggle: {
     flexDirection: 'row',
