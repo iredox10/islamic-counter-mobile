@@ -324,9 +324,13 @@ export default function CounterScreen() {
         const patch: Partial<typeof t> = { currentCount: nextCurrent };
         if (nextCurrent >= t.targetCount) {
           patch.status = 'completed';
-          await cancelGoalReminders(t);
+          await cancelGoalReminders(t).catch((e) =>
+            console.warn('cancelGoalReminders failed', e)
+          );
         } else if (t.currentCount === 0 && t.lateReminderId) {
-          await cancelLateReminder(t);
+          await cancelLateReminder(t).catch((e) =>
+            console.warn('cancelLateReminder failed', e)
+          );
         }
         await updateTarget(activeTargetId, patch);
       }
@@ -352,8 +356,12 @@ export default function CounterScreen() {
               ...(t && t.status === 'completed' ? { status: 'active' } : {}),
             });
             if (t) {
-              await cancelGoalReminders(t);
-              await scheduleGoalReminders({ ...t, currentCount: 0, status: 'active' as const });
+              await cancelGoalReminders(t).catch((e) =>
+                console.warn('cancelGoalReminders failed', e)
+              );
+              await scheduleGoalReminders({ ...t, currentCount: 0, status: 'active' as const }).catch(
+                (e) => console.warn('scheduleGoalReminders failed', e)
+              );
             }
           }
           if (prayerMode) {
@@ -397,9 +405,13 @@ export default function CounterScreen() {
         const patch: Partial<typeof t> = { currentCount: nextCurrent };
         if (nextCurrent >= t.targetCount) {
           patch.status = 'completed';
-          await cancelGoalReminders(t);
+          await cancelGoalReminders(t).catch((e) =>
+            console.warn('cancelGoalReminders failed', e)
+          );
         } else if (t.currentCount === 0 && t.lateReminderId) {
-          await cancelLateReminder(t);
+          await cancelLateReminder(t).catch((e) =>
+            console.warn('cancelLateReminder failed', e)
+          );
         }
         await updateTarget(activeTargetId, patch);
       }

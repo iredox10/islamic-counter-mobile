@@ -7,6 +7,7 @@ export interface DailyReminder {
   enabled: boolean;
   isSalahTime: boolean;
   message: string;
+  notificationId?: string;
 }
 
 export const DEFAULT_REMINDERS: DailyReminder[] = [

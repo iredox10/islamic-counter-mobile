@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -33,12 +34,75 @@ export function useAppFonts() {
 export default function RootLayout() {
   const dbReady = useDatabaseReady();
   const [fontsLoaded] = useAppFonts();
+  const responseSub = useRef<{ remove: () => void } | null>(null);
 
   useEffect(() => {
     if (dbReady && fontsLoaded) {
       SplashScreen.hideAsync();
     }
   }, [dbReady, fontsLoaded]);
+
+  useEffect(() => {
+    if (!dbReady) return;
+    if (Platform.OS === 'web') return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const Notifications = await import('expo-notifications');
+
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
+
+        const lastResponse = await Notifications.getLastNotificationResponse();
+        if (lastResponse && !cancelled) {
+          handleNotificationNavigation(lastResponse.notification.request.content.data);
+        }
+
+        const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+          handleNotificationNavigation(response.notification.request.content.data);
+        });
+        if (cancelled) {
+          sub.remove();
+          return;
+        }
+        responseSub.current = sub;
+
+        const [{ getTargets }, { scheduleGoalReminders }, { syncRemindersSchedule }] =
+          await Promise.all([
+            import('@/lib/db'),
+            import('@/lib/goalReminders'),
+            import('@/lib/pushNotifications'),
+          ]);
+
+        for (const t of getTargets()) {
+          if (t.status === 'active') {
+            await scheduleGoalReminders(t).catch((e) =>
+              console.warn('reschedule goal failed', t.id, e)
+            );
+          }
+        }
+        await syncRemindersSchedule().catch((e) =>
+          console.warn('reschedule daily reminders failed', e)
+        );
+      } catch (e) {
+        console.warn('Notification setup failed', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      responseSub.current?.remove();
+      responseSub.current = null;
+    };
+  }, [dbReady]);
 
   if (!dbReady || !fontsLoaded) return null;
 
@@ -47,6 +111,16 @@ export default function RootLayout() {
       <RootNav />
     </ThemeProvider>
   );
+}
+
+function handleNotificationNavigation(data: unknown) {
+  if (!data || typeof data !== 'object') return;
+  const d = data as { type?: string; targetId?: number; reminderId?: string };
+  if (d.type === 'goal' && typeof d.targetId === 'number') {
+    router.push('/(tabs)/targets');
+  } else if (d.type === 'daily') {
+    router.push('/(tabs)/settings');
+  }
 }
 
 function RootNav() {

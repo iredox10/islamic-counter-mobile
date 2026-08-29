@@ -165,7 +165,9 @@ export default function TargetsScreen() {
     }
 
     const created = await addTarget(payload as Omit<Target, 'id'>);
-    await scheduleGoalReminders(created);
+    await scheduleGoalReminders(created).catch((e) =>
+      console.warn('scheduleGoalReminders failed', e)
+    );
     resetForm();
     setShowForm(false);
   };

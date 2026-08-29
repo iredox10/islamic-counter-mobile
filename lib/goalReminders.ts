@@ -6,6 +6,12 @@ import type * as Notifications from 'expo-notifications';
 
 const CHANNEL_ID = 'goal-reminders';
 
+function androidContent(title: string, body: string, targetId: number) {
+  return Platform.OS === 'android'
+    ? { title, body, channelId: CHANNEL_ID, data: { type: 'goal', targetId } }
+    : { title, body, data: { type: 'goal', targetId } };
+}
+
 let module: typeof Notifications | null = null;
 let loadFailed = false;
 
@@ -113,10 +119,11 @@ export async function scheduleGoalReminders(target: Target): Promise<void> {
 
     if (target.frequency === 'daily') {
       const id = await n.scheduleNotificationAsync({
-        content: {
+        content: androidContent(
           title,
-          body: `Your dhikr session "${target.title}" is due (${target.reminderTime})`,
-        },
+          `Your dhikr session "${target.title}" is due (${target.reminderTime})`,
+          target.id
+        ),
         trigger: {
           type: n.SchedulableTriggerInputTypes.DAILY,
           hour,
@@ -128,10 +135,11 @@ export async function scheduleGoalReminders(target: Target): Promise<void> {
       const days = target.reminderDays?.length ? target.reminderDays : [];
       for (const day of days) {
         const id = await n.scheduleNotificationAsync({
-          content: {
+          content: androidContent(
             title,
-            body: `Weekly dhikr session "${target.title}" is due today (${target.reminderTime})`,
-          },
+            `Weekly dhikr session "${target.title}" is due today (${target.reminderTime})`,
+            target.id
+          ),
           trigger: {
             type: n.SchedulableTriggerInputTypes.WEEKLY,
             weekday: (day % 7) + 1,
@@ -146,10 +154,11 @@ export async function scheduleGoalReminders(target: Target): Promise<void> {
     const date = new Date(target.deadline);
     if (date.getTime() > Date.now()) {
       const id = await n.scheduleNotificationAsync({
-        content: {
-          title: '⏰ Goal Deadline',
-          body: `Reminder: "${target.title}" is due today (${format(date, 'MMM d, HH:mm')})`,
-        },
+        content: androidContent(
+          '⏰ Goal Deadline',
+          `Reminder: "${target.title}" is due today (${format(date, 'MMM d, HH:mm')})`,
+          target.id
+        ),
         trigger: {
           type: n.SchedulableTriggerInputTypes.DATE,
           date,
@@ -165,10 +174,11 @@ export async function scheduleGoalReminders(target: Target): Promise<void> {
     const triggerDate = fireAt.getTime() > Date.now() ? fireAt : new Date(Date.now() + 10 * 1000);
     if (fireAt.getTime() > Date.now() || target.currentCount === 0) {
       const id = await n.scheduleNotificationAsync({
-        content: {
-          title: '🕌 Dhikr Goal',
-          body: `You haven't started your goal of ${target.targetCount} yet!`,
-        },
+        content: androidContent(
+          '🕌 Dhikr Goal',
+          `You haven't started your goal of ${target.targetCount} yet!`,
+          target.id
+        ),
         trigger: {
           type: n.SchedulableTriggerInputTypes.DATE,
           date: triggerDate,

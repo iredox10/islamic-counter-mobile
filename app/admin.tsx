@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Text from '@/components/AppText';
@@ -17,6 +18,7 @@ import { Screen, Card, Title, Subtitle, GoldButton } from '@/components/ui';
 import { getLogs, getTargets, getUnlockedAchievements } from '@/lib/db';
 import { isAppwriteConfigured, APPWRITE_CONFIG } from '@/lib/appwrite';
 import { getStoredReminders } from '@/lib/reminders';
+import { getScheduledReminderCount } from '@/lib/pushNotifications';
 
 export default function AdminScreen() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function AdminScreen() {
   const [targetCount, setTargetCount] = useState<number>(0);
   const [achievementCount, setAchievementCount] = useState<number>(0);
   const [reminderCount, setReminderCount] = useState<number>(0);
+  const [scheduledCount, setScheduledCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const loadStats = async () => {
@@ -39,6 +42,7 @@ export default function AdminScreen() {
       setTargetCount(targets.length);
       setAchievementCount(achievements.length);
       setReminderCount(reminders.filter((r) => r.enabled).length);
+      setScheduledCount(await getScheduledReminderCount());
     } catch (e) {
       console.error('Failed to load admin stats:', e);
     }
@@ -148,11 +152,21 @@ export default function AdminScreen() {
           <Card>
             <View style={styles.cardHeader}>
               <Send size={20} color={colors.gold} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Push Notification Logs</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Local Notification Status</Text>
             </View>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              Local notifications schedule active. Next scheduled trigger aligned with Salah time alarms.
-            </Text>
+            {Platform.OS === 'web' ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+                On web, reminders run in the browser tab. Open the app and leave the tab in the foreground to receive them.
+              </Text>
+            ) : scheduledCount > 0 ? (
+              <Text style={{ color: colors.success, fontSize: 13, lineHeight: 18, fontWeight: '600' }}>
+                {scheduledCount} notification{scheduledCount === 1 ? '' : 's'} scheduled with the OS.
+              </Text>
+            ) : (
+              <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+                No notifications scheduled. Enable a daily reminder in Settings or create a goal with a reminder to schedule one.
+              </Text>
+            )}
             <GoldButton
               label="Refresh Metrics"
               onPress={loadStats}

@@ -38,7 +38,11 @@ import {
   type DailyReminder,
 } from '@/lib/reminders';
 import { clearAllData, exportAllData, importAndMergeData } from '@/lib/db';
-import { requestNotificationPermissions, scheduleLocalReminder } from '@/lib/pushNotifications';
+import {
+  requestNotificationPermissions,
+  scheduleLocalReminder,
+  cancelLocalReminder,
+} from '@/lib/pushNotifications';
 import {
   getSelectedSound,
   setSelectedSound,
@@ -71,7 +75,14 @@ export default function SettingsScreen() {
     const reminder = reminders.find((r) => r.id === id);
     const targetState = !reminder?.enabled;
     if (targetState) {
-      await requestNotificationPermissions();
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        Alert.alert(
+          'Permission needed',
+          'Enable notifications for Islamic Counter in your device settings to receive daily reminders.'
+        );
+        return;
+      }
     }
     const updated = updateReminder(reminders, id, {
       enabled: targetState,
@@ -79,8 +90,15 @@ export default function SettingsScreen() {
     setReminders(updated);
     await saveReminders(updated);
     const updatedReminder = updated.find((r) => r.id === id);
-    if (updatedReminder) {
-      await scheduleLocalReminder(updatedReminder);
+    if (!updatedReminder) return;
+    if (targetState) {
+      await scheduleLocalReminder(updatedReminder).catch((e) =>
+        console.warn('scheduleLocalReminder failed', e)
+      );
+    } else {
+      await cancelLocalReminder(updatedReminder).catch((e) =>
+        console.warn('cancelLocalReminder failed', e)
+      );
     }
   };
 
@@ -97,7 +115,9 @@ export default function SettingsScreen() {
     saveReminders(updated);
     const reminder = updated.find((r) => r.id === timePickerFor);
     if (reminder?.enabled) {
-      await scheduleLocalReminder(reminder);
+      await scheduleLocalReminder(reminder).catch((e) =>
+        console.warn('scheduleLocalReminder failed', e)
+      );
     }
     setTimePickerFor(null);
   };
