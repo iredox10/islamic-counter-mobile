@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getStoredReminders, saveReminders, type DailyReminder } from './reminders';
 import { playCompletionSound, getSelectedSound } from './sounds';
 import type * as Notifications from 'expo-notifications';
@@ -8,15 +9,23 @@ const DAILY_CHANNEL_ID = 'daily-reminders';
 let module: typeof Notifications | null = null;
 let loadFailed = false;
 
+function isExpoGoOnAndroid(): boolean {
+  return Platform.OS === 'android' && Constants.appOwnership === 'expo';
+}
+
 async function loadNotifications(): Promise<typeof Notifications | null> {
   if (module) return module;
   if (loadFailed) return null;
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || isExpoGoOnAndroid()) {
     loadFailed = true;
     return null;
   }
   try {
     const mod = await import('expo-notifications');
+    if (typeof mod.scheduleNotificationAsync !== 'function') {
+      loadFailed = true;
+      return null;
+    }
     module = mod;
     return module;
   } catch (e) {

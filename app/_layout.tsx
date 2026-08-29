@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -45,12 +46,23 @@ export default function RootLayout() {
   useEffect(() => {
     if (!dbReady) return;
     if (Platform.OS === 'web') return;
+    if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+      console.warn(
+        'expo-notifications is not supported in Expo Go on Android (SDK 53+). Run a development build to enable local notifications.'
+      );
+      return;
+    }
 
     let cancelled = false;
 
     (async () => {
       try {
         const Notifications = await import('expo-notifications');
+
+        if (typeof Notifications.setNotificationHandler !== 'function') {
+          console.warn('expo-notifications module is not fully available; skipping setup.');
+          return;
+        }
 
         Notifications.setNotificationHandler({
           handleNotification: async () => ({

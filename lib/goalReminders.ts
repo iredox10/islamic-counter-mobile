@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { format } from 'date-fns';
 import type { Target } from './types';
 import { updateTarget } from './db';
@@ -12,18 +13,26 @@ function androidContent(title: string, body: string, targetId: number) {
     : { title, body, data: { type: 'goal', targetId } };
 }
 
+function isExpoGoOnAndroid(): boolean {
+  return Platform.OS === 'android' && Constants.appOwnership === 'expo';
+}
+
 let module: typeof Notifications | null = null;
 let loadFailed = false;
 
 async function loadNotifications(): Promise<typeof Notifications | null> {
   if (module) return module;
   if (loadFailed) return null;
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || isExpoGoOnAndroid()) {
     loadFailed = true;
     return null;
   }
   try {
     const mod = await import('expo-notifications');
+    if (typeof mod.setNotificationHandler !== 'function') {
+      loadFailed = true;
+      return null;
+    }
     mod.setNotificationHandler({
       handleNotification: async () => ({
         shouldPlaySound: true,
