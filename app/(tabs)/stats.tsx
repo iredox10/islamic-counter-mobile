@@ -9,7 +9,16 @@ import {
 } from 'react-native';
 import Text from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { format, subDays } from 'date-fns';
+import {
+  format,
+  subDays,
+  subWeeks,
+  subMonths,
+  subYears,
+  isSameWeek,
+  isSameMonth,
+  isSameYear,
+} from 'date-fns';
 import { Plus, Flame, Check, Circle, ChevronDown, X } from 'lucide-react-native';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -24,7 +33,7 @@ import { addLog } from '@/lib/db';
 import { calculateStreak, formatDuration, todayStr } from '@/lib/utils';
 import { PRAYERS } from '@/lib/adhkar';
 
-type TimeRange = 'daily' | 'weekly';
+type TimeRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export default function StatsScreen() {
   const { colors } = useTheme();
@@ -73,20 +82,53 @@ export default function StatsScreen() {
         return { name: format(date, 'EEE'), dateStr, count };
       });
     }
-    // weekly - last 8 weeks as simple 7-day buckets
-    return Array.from({ length: 8 }).map((_, i) => {
-      const end = subDays(now, (7 - i) * 7);
-      const start = subDays(end, 6);
-      const startStr = format(start, 'yyyy-MM-dd');
-      const endStr = format(end, 'yyyy-MM-dd');
-      const count = filteredLogs
-        .filter((l) => l.dateStr >= startStr && l.dateStr <= endStr)
-        .reduce((a, l) => a + l.count, 0);
-      return { name: `W${i + 1}`, dateStr: endStr, count };
-    });
+    if (range === 'weekly') {
+      return Array.from({ length: 8 }).map((_, i) => {
+        const date = subWeeks(now, 7 - i);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const count = filteredLogs
+          .filter((l) =>
+            isSameWeek(new Date(l.timestamp || l.dateStr), date, {
+              weekStartsOn: 1,
+            })
+          )
+          .reduce((a, l) => a + l.count, 0);
+        return { name: `W${format(date, 'w')}`, dateStr, count };
+      });
+    }
+    if (range === 'monthly') {
+      return Array.from({ length: 6 }).map((_, i) => {
+        const date = subMonths(now, 5 - i);
+        const dateStr = format(date, 'yyyy-MM');
+        const count = filteredLogs
+          .filter((l) =>
+            isSameMonth(new Date(l.timestamp || l.dateStr), date)
+          )
+          .reduce((a, l) => a + l.count, 0);
+        return { name: format(date, 'MMM'), dateStr, count };
+      });
+    }
+    if (range === 'yearly') {
+      return Array.from({ length: 3 }).map((_, i) => {
+        const date = subYears(now, 2 - i);
+        const dateStr = format(date, 'yyyy');
+        const count = filteredLogs
+          .filter((l) =>
+            isSameYear(new Date(l.timestamp || l.dateStr), date)
+          )
+          .reduce((a, l) => a + l.count, 0);
+        return { name: format(date, 'yyyy'), dateStr, count };
+      });
+    }
+    return [];
   }, [filteredLogs, range]);
 
   const maxCount = Math.max(...chartData.map((d) => d.count), 1);
+  const rangeTotal = useMemo(
+    () => chartData.reduce((a, d) => a + d.count, 0),
+    [chartData]
+  );
+  const barWidth = range === 'yearly' ? 32 : range === 'monthly' ? 24 : 18;
   const totalCount = filteredLogs.reduce((a, l) => a + l.count, 0);
   const todayTotal = filteredLogs
     .filter((l) => l.dateStr === todayStr())
@@ -226,39 +268,69 @@ export default function StatsScreen() {
 
           {/* Chart */}
           <View style={{ marginTop: 20 }}>
-            <View style={styles.tabs}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabs}
+            >
               <Chip
-                label="7 days"
+                label="Daily"
                 active={range === 'daily'}
                 onPress={() => setRange('daily')}
               />
               <Chip
-                label="8 weeks"
+                label="Weekly"
                 active={range === 'weekly'}
                 onPress={() => setRange('weekly')}
               />
-            </View>
+              <Chip
+                label="Monthly"
+                active={range === 'monthly'}
+                onPress={() => setRange('monthly')}
+              />
+              <Chip
+                label="Yearly"
+                active={range === 'yearly'}
+                onPress={() => setRange('yearly')}
+              />
+            </ScrollView>
 
             <Card style={{ marginTop: 12 }}>
+              <View style={styles.chartHeader}>
+                <Text style={[styles.chartHeaderTitle, { color: colors.text }]}>
+                  {range.charAt(0).toUpperCase() + range.slice(1)} Activity
+                </Text>
+                <Text style={[styles.chartHeaderTotal, { color: colors.gold }]}>
+                  {rangeTotal.toLocaleString()}
+                </Text>
+              </View>
+
               <View style={styles.chart}>
                 {chartData.map((d) => {
                   const h = Math.max(4, (d.count / maxCount) * 120);
                   return (
                     <View key={d.dateStr + d.name} style={styles.barCol}>
-                      <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-                        {d.count || ''}
+                      <Text
+                        style={{ color: colors.textMuted, fontSize: 10 }}
+                        numberOfLines={1}
+                      >
+                        {formatBarCount(d.count)}
                       </Text>
                       <View
                         style={[
                           styles.bar,
                           {
+                            width: barWidth,
                             height: h,
                             backgroundColor:
                               d.count > 0 ? colors.gold : colors.inputBg,
                           },
                         ]}
                       />
-                      <Text style={{ color: colors.textMuted, fontSize: 10 }}>
+                      <Text
+                        style={{ color: colors.textMuted, fontSize: 10 }}
+                        numberOfLines={1}
+                      >
                         {d.name}
                       </Text>
                     </View>
@@ -660,6 +732,13 @@ export default function StatsScreen() {
   );
 }
 
+function formatBarCount(count: number): string {
+  if (!count) return '';
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 10_000) return `${(count / 1_000).toFixed(count % 1_000 === 0 ? 0 : 1)}k`;
+  return count.toLocaleString();
+}
+
 function SummaryCard({
   label,
   value,
@@ -743,6 +822,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  chartHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  chartHeaderTotal: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   chart: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -756,7 +849,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   bar: {
-    width: 18,
     borderRadius: 6,
   },
   prayerGrid: {
