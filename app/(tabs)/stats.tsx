@@ -10,7 +10,7 @@ import {
 import Text from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, subDays } from 'date-fns';
-import { Plus, Flame, Check, Circle } from 'lucide-react-native';
+import { Plus, Flame, Check, Circle, ChevronDown, X } from 'lucide-react-native';
 
 import { useTheme } from '@/context/ThemeContext';
 import { Screen, Card, Title, Subtitle, Chip } from '@/components/ui';
@@ -20,7 +20,7 @@ import {
   useDurations,
   usePrayerCompletions,
 } from '@/hooks/useDatabase';
-import { addLog, updateTarget, getTarget } from '@/lib/db';
+import { addLog } from '@/lib/db';
 import { calculateStreak, formatDuration, todayStr } from '@/lib/utils';
 import { PRAYERS } from '@/lib/adhkar';
 
@@ -33,9 +33,33 @@ export default function StatsScreen() {
   const durations = useDurations();
   const prayerCompletions = usePrayerCompletions();
   const [range, setRange] = useState<TimeRange>('daily');
+  const [selectedTargetId, setSelectedTargetId] = useState<number | 'all'>('all');
+  const [showGoalFilter, setShowGoalFilter] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [manualCount, setManualCount] = useState('');
   const [manualDate, setManualDate] = useState(todayStr());
+
+  const selectedGoalName = useMemo(() => {
+    if (selectedTargetId === 'all') return 'All Goals';
+    const target = targets.find((t) => t.id === selectedTargetId);
+    return target?.title ?? 'All Goals';
+  }, [selectedTargetId, targets]);
+
+  const filteredLogs = useMemo(
+    () =>
+      selectedTargetId === 'all'
+        ? logs
+        : logs.filter((l) => l.targetId === selectedTargetId),
+    [logs, selectedTargetId]
+  );
+
+  const filteredDurations = useMemo(
+    () =>
+      selectedTargetId === 'all'
+        ? durations
+        : durations.filter((d) => d.targetId === selectedTargetId),
+    [durations, selectedTargetId]
+  );
 
   const chartData = useMemo(() => {
     const now = new Date();
@@ -43,7 +67,7 @@ export default function StatsScreen() {
       return Array.from({ length: 7 }).map((_, i) => {
         const date = subDays(now, 6 - i);
         const dateStr = format(date, 'yyyy-MM-dd');
-        const count = logs
+        const count = filteredLogs
           .filter((l) => l.dateStr === dateStr)
           .reduce((a, l) => a + l.count, 0);
         return { name: format(date, 'EEE'), dateStr, count };
@@ -55,21 +79,29 @@ export default function StatsScreen() {
       const start = subDays(end, 6);
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
-      const count = logs
+      const count = filteredLogs
         .filter((l) => l.dateStr >= startStr && l.dateStr <= endStr)
         .reduce((a, l) => a + l.count, 0);
       return { name: `W${i + 1}`, dateStr: endStr, count };
     });
-  }, [logs, range]);
+  }, [filteredLogs, range]);
 
   const maxCount = Math.max(...chartData.map((d) => d.count), 1);
-  const totalCount = logs.reduce((a, l) => a + l.count, 0);
-  const todayTotal = logs
+  const totalCount = filteredLogs.reduce((a, l) => a + l.count, 0);
+  const todayTotal = filteredLogs
     .filter((l) => l.dateStr === todayStr())
     .reduce((a, l) => a + l.count, 0);
-  const uniqueDates = [...new Set(logs.map((l) => l.dateStr))];
+  const totalSeconds = filteredDurations.reduce((a, d) => a + d.seconds, 0);
+
+  const bestDayCount = filteredLogs.length > 0
+    ? Math.max(0, ...Object.values(filteredLogs.reduce((acc: Record<string, number>, l) => {
+        acc[l.dateStr] = (acc[l.dateStr] || 0) + l.count;
+        return acc;
+      }, {})))
+    : 0;
+
+  const uniqueDates = [...new Set(filteredLogs.map((l) => l.dateStr))];
   const { currentStreak, longestStreak } = calculateStreak(uniqueDates);
-  const totalSeconds = durations.reduce((a, d) => a + d.seconds, 0);
 
   const todayPrayers = new Set(
     prayerCompletions.filter((p) => p.dateStr === todayStr()).map((p) => p.prayer)
@@ -80,6 +112,7 @@ export default function StatsScreen() {
     if (!count) return;
     await addLog({
       count,
+      targetId: selectedTargetId === 'all' ? undefined : selectedTargetId,
       timestamp: new Date(manualDate).toISOString(),
       dateStr: manualDate,
     });
@@ -92,51 +125,64 @@ export default function StatsScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.header}>
-            <View>
+            <View style={{ flex: 1, marginRight: 8 }}>
               <Title>Progress</Title>
               <Subtitle>Your dhikr journey</Subtitle>
             </View>
-            <Pressable
-              onPress={() => setShowManual(true)}
-              style={[styles.addBtn, { backgroundColor: colors.gold }]}
-            >
-              <Plus size={22} color="#020617" />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => setShowGoalFilter(true)}
+                style={[
+                  styles.filterBtn,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.cardBorder,
+                  },
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[styles.filterBtnText, { color: colors.text }]}
+                >
+                  {selectedGoalName}
+                </Text>
+                <ChevronDown size={14} color={colors.textSecondary} />
+              </Pressable>
+
+              <Pressable
+                onPress={() => setShowManual(true)}
+                style={[styles.addBtn, { backgroundColor: colors.gold }]}
+              >
+                <Plus size={22} color="#020617" />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Summary cards */}
+          {/* Top Summary cards */}
           <View style={styles.summaryGrid}>
             <SummaryCard
-              label="Today"
-              value={String(todayTotal)}
-              colors={colors}
-            />
-            <SummaryCard
-              label="All time"
+              label="Lifetime count"
               value={String(totalCount)}
               colors={colors}
             />
             <SummaryCard
-              label="Streak"
+              label="Time spent"
+              value={formatDuration(totalSeconds)}
+              colors={colors}
+            />
+            <SummaryCard
+              label="Best day"
+              value={String(bestDayCount)}
+              colors={colors}
+            />
+            <SummaryCard
+              label="Streak days"
               value={`${currentStreak}d`}
               colors={colors}
               icon={<Flame size={14} color={colors.gold} />}
             />
-            <SummaryCard
-              label="Best streak"
-              value={`${longestStreak}d`}
-              colors={colors}
-            />
           </View>
-
-          <Card style={{ marginTop: 16 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              Total time counting
-            </Text>
-            <Text style={{ color: colors.gold, fontSize: 22, fontWeight: '700', marginTop: 4 }}>
-              {formatDuration(totalSeconds)}
-            </Text>
-          </Card>
 
           {/* Chart */}
           <View style={{ marginTop: 20 }}>
@@ -263,6 +309,138 @@ export default function StatsScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {/* Goal Filter Modal */}
+      <Modal visible={showGoalFilter} transparent animationType="fade">
+        <Pressable
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
+          onPress={() => setShowGoalFilter(false)}
+        >
+          <Pressable
+            style={styles.pickerBackdropTap}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Card style={styles.pickerCard}>
+              <View style={styles.pickerHeader}>
+                <Title style={{ fontSize: 18 }}>Filter by Goal</Title>
+                <Pressable
+                  onPress={() => setShowGoalFilter(false)}
+                  hitSlop={8}
+                  style={[styles.closeBtn, { backgroundColor: colors.inputBg }]}
+                >
+                  <X size={18} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: 320 }}
+                contentContainerStyle={{ gap: 8 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {/* All Goals option */}
+                <Pressable
+                  onPress={() => {
+                    setSelectedTargetId('all');
+                    setShowGoalFilter(false);
+                  }}
+                  style={[
+                    styles.goalOption,
+                    {
+                      backgroundColor:
+                        selectedTargetId === 'all'
+                          ? colors.goldMuted
+                          : colors.inputBg,
+                      borderColor:
+                        selectedTargetId === 'all'
+                          ? colors.gold
+                          : colors.cardBorder,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: selectedTargetId === 'all' ? '700' : '600',
+                        color:
+                          selectedTargetId === 'all'
+                            ? colors.gold
+                            : colors.text,
+                      }}
+                    >
+                      All Goals
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: colors.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      Combined statistics across all dhikr
+                    </Text>
+                  </View>
+                  {selectedTargetId === 'all' && (
+                    <Check size={18} color={colors.gold} />
+                  )}
+                </Pressable>
+
+                {/* Individual targets */}
+                {targets.map((t) => {
+                  const isSelected = selectedTargetId === t.id;
+                  return (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => {
+                        setSelectedTargetId(t.id);
+                        setShowGoalFilter(false);
+                      }}
+                      style={[
+                        styles.goalOption,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.goldMuted
+                            : colors.inputBg,
+                          borderColor: isSelected
+                            ? colors.gold
+                            : colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: isSelected ? '700' : '600',
+                            color: isSelected ? colors.gold : colors.text,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t.title}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: colors.textSecondary,
+                            marginTop: 2,
+                          }}
+                        >
+                          {t.currentCount.toLocaleString()} / {t.targetCount.toLocaleString()} ({Math.round(Math.min(100, (t.currentCount / t.targetCount) * 100))}%)
+                          {t.status !== 'active' ? ` • ${t.status}` : ''}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Check size={18} color={colors.gold} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </Card>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Manual offline entry modal */}
       <Modal visible={showManual} transparent animationType="slide">
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <Card style={{ marginHorizontal: 20 }}>
@@ -360,6 +538,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    maxWidth: 140,
+  },
+  filterBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
   addBtn: {
     width: 44,
     height: 44,
@@ -419,6 +617,35 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
+  },
+  pickerBackdropTap: {
+    marginHorizontal: 20,
+  },
+  pickerCard: {
+    maxHeight: 420,
+    padding: 16,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   input: {
     marginTop: 12,
