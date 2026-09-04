@@ -107,6 +107,46 @@ export default function StatsScreen() {
     prayerCompletions.filter((p) => p.dateStr === todayStr()).map((p) => p.prayer)
   );
 
+  const prayerStreak = useMemo(() => {
+    if (!prayerCompletions || prayerCompletions.length === 0) return 0;
+    const allDates = [...new Set(prayerCompletions.map((c) => c.dateStr))].sort().reverse();
+    let streak = 0;
+    const today = todayStr();
+    for (let i = 0; i < allDates.length; i++) {
+      const expectedDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
+      const dateCompletions = prayerCompletions.filter((c) => c.dateStr === expectedDate);
+      const uniquePrayers = new Set(dateCompletions.map((c) => c.prayer));
+      if (uniquePrayers.size === 5) {
+        streak++;
+      } else if (expectedDate !== today || i > 0) {
+        break;
+      }
+    }
+    return streak;
+  }, [prayerCompletions]);
+
+  const last7Days = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 7 }).map((_, i) => format(subDays(now, 6 - i), 'yyyy-MM-dd'));
+  }, []);
+
+  const prayerStatsByDay = useMemo(() => {
+    return last7Days.map((dateStr) => {
+      const dayCompletions = prayerCompletions.filter((c) => c.dateStr === dateStr);
+      return {
+        dateStr,
+        dayName: format(new Date(dateStr + 'T00:00:00'), 'EEE'),
+        isToday: dateStr === todayStr(),
+        prayers: PRAYERS.map((p) => ({
+          id: p.id,
+          name: p.name,
+          arabicName: p.arabicName,
+          completed: dayCompletions.some((c) => c.prayer === p.id),
+        })),
+      };
+    });
+  }, [last7Days, prayerCompletions]);
+
   const handleManual = async () => {
     const count = parseInt(manualCount, 10);
     if (!count) return;
@@ -228,6 +268,36 @@ export default function StatsScreen() {
             </Card>
           </View>
 
+          {/* Prayer Streak Banner */}
+          {prayerStreak > 0 && (
+            <View
+              style={[
+                styles.streakBanner,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: 'rgba(245, 158, 11, 0.3)',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.streakIconWrap,
+                  { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
+                ]}
+              >
+                <Flame size={24} color="#f59e0b" />
+              </View>
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <Text style={[styles.streakNumber, { color: colors.text }]}>
+                  {prayerStreak}
+                </Text>
+                <Text style={[styles.streakSubtitle, { color: colors.textSecondary }]}>
+                  day streak completing all 5 prayers
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Prayer completions today */}
           <View style={{ marginTop: 20 }}>
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
@@ -266,6 +336,98 @@ export default function StatsScreen() {
                 );
               })}
             </View>
+          </View>
+
+          {/* Weekly Prayer Adhkar */}
+          <View style={{ marginTop: 20 }}>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
+              Weekly Prayer Adhkar
+            </Text>
+            <Card style={{ marginTop: 12, padding: 14 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ minWidth: '100%' }}
+              >
+                <View style={{ flex: 1 }}>
+                  {/* Header row */}
+                  <View
+                    style={[
+                      styles.matrixHeaderRow,
+                      { borderBottomColor: colors.cardBorder },
+                    ]}
+                  >
+                    <View style={styles.matrixDayCol}>
+                      <Text style={[styles.matrixHeaderText, { color: colors.textMuted }]}>
+                        Day
+                      </Text>
+                    </View>
+                    {PRAYERS.map((p) => (
+                      <View key={p.id} style={styles.matrixPrayerCol}>
+                        <Text
+                          style={[styles.matrixHeaderText, { color: colors.textSecondary }]}
+                          numberOfLines={1}
+                        >
+                          {p.arabicName}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* 7 day rows */}
+                  {prayerStatsByDay.map((day, idx) => {
+                    const isLast = idx === prayerStatsByDay.length - 1;
+                    return (
+                      <View
+                        key={day.dateStr}
+                        style={[
+                          styles.matrixRow,
+                          {
+                            borderBottomWidth: isLast ? 0 : 1,
+                            borderBottomColor: colors.cardBorder,
+                            backgroundColor: day.isToday
+                              ? (colors.goldMuted || 'rgba(245, 158, 11, 0.10)')
+                              : 'transparent',
+                          },
+                        ]}
+                      >
+                        <View style={styles.matrixDayCol}>
+                          <Text
+                            style={[
+                              styles.matrixDayText,
+                              {
+                                color: day.isToday ? colors.gold : colors.textSecondary,
+                                fontWeight: day.isToday ? '700' : '500',
+                              },
+                            ]}
+                          >
+                            {day.dayName}
+                          </Text>
+                        </View>
+                        {day.prayers.map((prayer) => (
+                          <View key={prayer.id} style={styles.matrixPrayerCol}>
+                            {prayer.completed ? (
+                              <View
+                                style={[
+                                  styles.matrixCheckCircle,
+                                  { backgroundColor: 'rgba(16, 185, 129, 0.20)' },
+                                ]}
+                              >
+                                <Check size={12} color={colors.success} />
+                              </View>
+                            ) : (
+                              <View style={styles.matrixIncompleteCircle}>
+                                <Circle size={12} color={colors.textMuted} />
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </Card>
           </View>
 
           {/* Active goals snapshot */}
@@ -659,5 +821,74 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  streakBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 14,
+    marginTop: 20,
+  },
+  streakIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakNumber: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  streakSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  matrixHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  matrixHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  matrixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+  },
+  matrixDayCol: {
+    width: 48,
+    justifyContent: 'center',
+  },
+  matrixDayText: {
+    fontSize: 12,
+  },
+  matrixPrayerCol: {
+    flex: 1,
+    minWidth: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matrixCheckCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matrixIncompleteCircle: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
