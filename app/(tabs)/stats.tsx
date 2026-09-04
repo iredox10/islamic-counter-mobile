@@ -6,6 +6,7 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import Text from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +20,18 @@ import {
   isSameMonth,
   isSameYear,
 } from 'date-fns';
-import { Plus, Flame, Check, Circle, ChevronDown, X } from 'lucide-react-native';
+import {
+  Plus,
+  Flame,
+  Check,
+  Circle,
+  ChevronDown,
+  X,
+  Calendar,
+} from 'lucide-react-native';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 
 import { useTheme } from '@/context/ThemeContext';
 import { Screen, Card, Title, Subtitle, Chip } from '@/components/ui';
@@ -29,7 +41,7 @@ import {
   useDurations,
   usePrayerCompletions,
 } from '@/hooks/useDatabase';
-import { addLog } from '@/lib/db';
+import { addLog, getTarget, updateTarget } from '@/lib/db';
 import { calculateStreak, formatDuration, todayStr } from '@/lib/utils';
 import { PRAYERS } from '@/lib/adhkar';
 
@@ -47,6 +59,8 @@ export default function StatsScreen() {
   const [showManual, setShowManual] = useState(false);
   const [manualCount, setManualCount] = useState('');
   const [manualDate, setManualDate] = useState(todayStr());
+  const [manualTargetId, setManualTargetId] = useState<number | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const selectedGoalName = useMemo(() => {
     if (selectedTargetId === 'all') return 'All Goals';
@@ -189,16 +203,92 @@ export default function StatsScreen() {
     });
   }, [last7Days, prayerCompletions]);
 
+  const activeTargets = useMemo(
+    () => targets.filter((t) => t.status === 'active'),
+    [targets]
+  );
+
+  const formattedManualDate = useMemo(() => {
+    try {
+      const d = new Date(manualDate + 'T12:00:00');
+      return isNaN(d.getTime())
+        ? format(new Date(), 'MMM d, yyyy')
+        : format(d, 'MMM d, yyyy');
+    } catch {
+      return format(new Date(), 'MMM d, yyyy');
+    }
+  }, [manualDate]);
+
+  const pickerDateValue = useMemo(() => {
+    try {
+      const d = new Date(manualDate + 'T12:00:00');
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch {
+      return new Date();
+    }
+  }, [manualDate]);
+
+  const maxPickerDate = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, []);
+
+  const handleDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date
+  ) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false);
+      return;
+    }
+    if (selectedDate) {
+      setShowDatePicker(false);
+      setManualDate(format(selectedDate, 'yyyy-MM-dd'));
+    }
+  };
+
+  const handleCloseManual = () => {
+    setManualCount('');
+    setManualDate(todayStr());
+    setManualTargetId(null);
+    setShowDatePicker(false);
+    setShowManual(false);
+  };
+
+  const handleOpenManual = () => {
+    setManualCount('');
+    setManualDate(todayStr());
+    setManualTargetId(null);
+    setShowDatePicker(false);
+    setShowManual(true);
+  };
+
   const handleManual = async () => {
     const count = parseInt(manualCount, 10);
     if (!count) return;
+    const targetId = manualTargetId ?? undefined;
     await addLog({
       count,
-      targetId: selectedTargetId === 'all' ? undefined : selectedTargetId,
-      timestamp: new Date(manualDate).toISOString(),
+      timestamp: new Date(manualDate + 'T12:00:00').toISOString(),
       dateStr: manualDate,
+      targetId,
     });
+    if (targetId) {
+      const target = getTarget(targetId);
+      if (target) {
+        await updateTarget(targetId, {
+          currentCount: (target.currentCount || 0) + count,
+        });
+      }
+    }
     setManualCount('');
+    setManualDate(todayStr());
+    setManualTargetId(null);
+    setShowDatePicker(false);
     setShowManual(false);
   };
 
@@ -233,7 +323,7 @@ export default function StatsScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => setShowManual(true)}
+                onPress={handleOpenManual}
                 style={[styles.addBtn, { backgroundColor: colors.gold }]}
               >
                 <Plus size={22} color="#020617" />
@@ -675,7 +765,12 @@ export default function StatsScreen() {
       </Modal>
 
       {/* Manual offline entry modal */}
-      <Modal visible={showManual} transparent animationType="slide">
+      <Modal
+        visible={showManual}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseManual}
+      >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <Card style={{ marginHorizontal: 20 }}>
             <Title style={{ fontSize: 20 }}>Add counts</Title>
@@ -695,23 +790,50 @@ export default function StatsScreen() {
                 },
               ]}
             />
-            <TextInput
-              value={manualDate}
-              onChangeText={setManualDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textMuted}
+            <Pressable
+              onPress={() => setShowDatePicker(true)}
               style={[
-                styles.input,
+                styles.dateSelector,
                 {
                   backgroundColor: colors.inputBg,
-                  color: colors.text,
                   borderColor: colors.cardBorder,
                 },
               ]}
-            />
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+            >
+              <Calendar size={18} color={colors.gold} />
+              <Text style={[styles.dateSelectorText, { color: colors.text }]}>
+                {formattedManualDate}
+              </Text>
+            </Pressable>
+
+            <View style={{ marginTop: 14 }}>
+              <Text style={[styles.modalSectionLabel, { color: colors.textMuted }]}>
+                Assign to Goal
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.goalChipsContainer}
+              >
+                <Chip
+                  label="General (No Goal)"
+                  active={manualTargetId === null}
+                  onPress={() => setManualTargetId(null)}
+                />
+                {activeTargets.map((target) => (
+                  <Chip
+                    key={target.id}
+                    label={target.title}
+                    active={manualTargetId === target.id}
+                    onPress={() => setManualTargetId(target.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
               <Pressable
-                onPress={() => setShowManual(false)}
+                onPress={handleCloseManual}
                 style={[styles.modalBtn, { flex: 1, backgroundColor: colors.inputBg }]}
               >
                 <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
@@ -727,6 +849,15 @@ export default function StatsScreen() {
             </View>
           </Card>
         </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={pickerDateValue > maxPickerDate ? maxPickerDate : pickerDateValue}
+            mode="date"
+            maximumDate={maxPickerDate}
+            onChange={handleDateChange}
+          />
+        )}
       </Modal>
     </Screen>
   );
@@ -908,6 +1039,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+  },
+  dateSelector: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dateSelectorText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalSectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  goalChipsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
   },
   modalBtn: {
     paddingVertical: 14,
